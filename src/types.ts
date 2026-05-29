@@ -40,6 +40,9 @@ export interface Task {
   createdAt: string;
   updatedAt: string;
   orden?: number;
+  fechaInicio?: string;
+  fechaFin?: string;
+  tipo?: "PoC" | "Presentation" | "Run" | "Build" | "";
 }
 
 export interface Session {

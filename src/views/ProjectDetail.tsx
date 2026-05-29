@@ -78,6 +78,35 @@ const SortableTaskCard = ({ task, status, onMove, onDelete, onGenerate, onEditTa
       </div>
       <p className="text-xs text-zinc-500 line-clamp-2 mb-4 ml-6">{task.descripcion || "Sin descripción"}</p>
       
+      {task.tipo && (
+        <div className="mb-4 ml-6 flex">
+          <span className={cn(
+            "inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold border shadow-sm",
+            task.tipo === "PoC" && "bg-indigo-50 border-indigo-200 text-indigo-700",
+            task.tipo === "Presentation" && "bg-purple-50 border-purple-200 text-purple-705",
+            task.tipo === "Build" && "bg-amber-100 border-amber-300 text-amber-800",
+            task.tipo === "Run" && "bg-red-50 border-red-200 text-red-600"
+          )}>
+            {task.tipo === "Presentation" ? "Presentación" : task.tipo}
+          </span>
+        </div>
+      )}
+      
+      {(task.fechaInicio || task.fechaFin) && (
+        <div className="flex items-center gap-3 mb-4 ml-6 text-[10px] text-zinc-500 font-medium">
+          {task.fechaInicio && (
+            <span className="bg-zinc-100 px-2 py-0.5 rounded border border-zinc-200">
+              Inicio: {task.fechaInicio}
+            </span>
+          )}
+          {task.fechaFin && (
+            <span className="bg-zinc-100 px-2 py-0.5 rounded border border-zinc-200">
+              Fin: {task.fechaFin}
+            </span>
+          )}
+        </div>
+      )}
+
       {task.tags && task.tags.length > 0 && (
         <div className="flex flex-wrap gap-1 mb-4 ml-6">
           {task.tags.map((tag: string, i: number) => (
@@ -211,7 +240,7 @@ export const ProjectDetail: React.FC = () => {
     setIsTaskModalOpen(true);
   };
 
-  const handleSaveTask = async (data: { titulo: string; descripcion: string; tags: string[] }) => {
+  const handleSaveTask = async (data: { titulo: string; descripcion: string; tags: string[]; fechaInicio?: string; fechaFin?: string; tipo?: "PoC" | "Presentation" | "Run" | "Build" | "" }) => {
     if (!id) return;
 
     if (taskToEdit) {
@@ -429,10 +458,14 @@ export const ProjectDetail: React.FC = () => {
         onClose={() => setIsTaskModalOpen(false)}
         onSave={handleSaveTask}
         onDelete={() => taskToEdit && handleDeleteTask(taskToEdit.id)}
+        contextType="project"
         initialData={taskToEdit ? {
           titulo: taskToEdit.titulo,
           descripcion: taskToEdit.descripcion || "",
-          tags: taskToEdit.tags || []
+          tags: taskToEdit.tags || [],
+          fechaInicio: taskToEdit.fechaInicio,
+          fechaFin: taskToEdit.fechaFin,
+          tipo: taskToEdit.tipo,
         } : undefined}
       />
     </div>

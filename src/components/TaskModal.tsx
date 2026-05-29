@@ -5,26 +5,36 @@ import { X, Plus, Tag as TagIcon, Trash2 } from "lucide-react";
 interface TaskModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (data: { titulo: string; descripcion: string; tags: string[] }) => void;
+  onSave: (data: { titulo: string; descripcion: string; tags: string[]; fechaInicio?: string; fechaFin?: string; tipo?: "PoC" | "Presentation" | "Run" | "Build" | "" }) => void;
   onDelete?: () => void;
+  contextType: "initiative" | "project";
   initialData?: {
     titulo: string;
     descripcion: string;
     tags: string[];
+    fechaInicio?: string;
+    fechaFin?: string;
+    tipo?: string;
   };
 }
 
-export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSave, onDelete, initialData }) => {
+export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSave, onDelete, contextType, initialData }) => {
   const [title, setTitle] = useState(initialData?.titulo || "");
   const [description, setDescription] = useState(initialData?.descripcion || "");
   const [tagInput, setTagInput] = useState("");
   const [tags, setTags] = useState<string[]>(initialData?.tags || []);
+  const [startDate, setStartDate] = useState(initialData?.fechaInicio || "");
+  const [endDate, setEndDate] = useState(initialData?.fechaFin || "");
+  const [tipo, setTipo] = useState<"PoC" | "Presentation" | "Run" | "Build" | "">(initialData?.tipo as any || "");
 
   React.useEffect(() => {
     if (isOpen) {
       setTitle(initialData?.titulo || "");
       setDescription(initialData?.descripcion || "");
       setTags(initialData?.tags || []);
+      setStartDate(initialData?.fechaInicio || "");
+      setEndDate(initialData?.fechaFin || "");
+      setTipo(initialData?.tipo as any || "");
     }
   }, [isOpen, initialData]);
 
@@ -45,11 +55,17 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSave, o
       onSave({
         titulo: title.trim(),
         descripcion: description.trim(),
-        tags
+        tags,
+        fechaInicio: startDate,
+        fechaFin: endDate,
+        tipo
       });
       setTitle("");
       setDescription("");
       setTags([]);
+      setStartDate("");
+      setEndDate("");
+      setTipo("");
       onClose();
     }
   };
@@ -111,6 +127,49 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSave, o
                   rows={3}
                   className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-zinc-900/5 focus:border-zinc-900 transition-all resize-none"
                 />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">Fecha Inicio</label>
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:border-zinc-900 transition-all"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">Fecha Fin</label>
+                  <input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:border-zinc-900 transition-all"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">Tipo de Tarea</label>
+                <select
+                  value={tipo}
+                  onChange={(e) => setTipo(e.target.value as any)}
+                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:border-zinc-900 transition-all cursor-pointer font-medium"
+                >
+                  <option value="">Seleccione un tipo...</option>
+                  {contextType === "initiative" ? (
+                    <>
+                      <option value="PoC">PoC</option>
+                      <option value="Presentation">Presentación</option>
+                    </>
+                  ) : (
+                    <>
+                      <option value="Run">Run</option>
+                      <option value="Build">Build</option>
+                    </>
+                  )}
+                </select>
               </div>
 
               <div className="space-y-2">

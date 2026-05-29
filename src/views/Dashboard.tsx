@@ -7,6 +7,7 @@ import { es } from "date-fns/locale";
 import { Rocket, CheckCircle2, MessageSquare, Calendar as CalendarIcon, ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import { motion } from "motion/react";
+import { cn } from "../lib/utils";
 
 const NewsIcon = ({ type }: { type: News["tipo"] }) => {
   switch (type) {
@@ -25,6 +26,9 @@ export const Dashboard: React.FC = () => {
   const [activeProjectsCount, setActiveProjectsCount] = useState<number>(0);
   const [activeTasksCount, setActiveTasksCount] = useState<number>(0);
   const [upcomingSessionsCount, setUpcomingSessionsCount] = useState<number>(0);
+  const [pendingTasks, setPendingTasks] = useState<Task[]>([]);
+  const [projectsMap, setProjectsMap] = useState<Record<string, string>>({});
+  const [initiativesMap, setInitiativesMap] = useState<Record<string, string>>({});
 
   useEffect(() => {
     const qNews = query(collection(db, "news"), orderBy("createdAt", "desc"), limit(10));
@@ -41,12 +45,24 @@ export const Dashboard: React.FC = () => {
     const unsubActiveInit = onSnapshot(collection(db, "initiatives"), (snap) => {
       const activeCount = snap.docs.filter(doc => doc.data().estado !== "closed").length;
       setActiveInitiativesCount(activeCount);
+
+      const initMap: Record<string, string> = {};
+      snap.docs.forEach(doc => {
+        initMap[doc.id] = doc.data().nombre || "";
+      });
+      setInitiativesMap(initMap);
     });
 
     // Count active projects (treating missing estado as active)
     const unsubActiveProj = onSnapshot(collection(db, "projects"), (snap) => {
       const activeCount = snap.docs.filter(doc => doc.data().estado !== "closed").length;
       setActiveProjectsCount(activeCount);
+
+      const projMap: Record<string, string> = {};
+      snap.docs.forEach(doc => {
+        projMap[doc.id] = doc.data().nombre || "";
+      });
+      setProjectsMap(projMap);
     });
 
     // Count in-progress tasks across all initiatives using collectionGroup
@@ -68,6 +84,15 @@ export const Dashboard: React.FC = () => {
       setUpcomingSessionsCount(snap.size);
     });
 
+    // Load pending tasks (todo or in_progress) to calculate pending scores
+    const qPendingTasks = query(
+      collectionGroup(db, "tasks"),
+      where("estado", "in", ["todo", "in_progress"])
+    );
+    const unsubPendingTasks = onSnapshot(qPendingTasks, (snap) => {
+      setPendingTasks(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task)));
+    });
+
     return () => {
       unsubNews();
       unsubLatestInit();
@@ -75,8 +100,84 @@ export const Dashboard: React.FC = () => {
       unsubActiveProj();
       unsubTasks();
       unsubSessions();
+      unsubPendingTasks();
     };
   }, []);
+
+  const getTaskDetails = (task: Task) => {
+    const tipo = (task.tipo as string) || "";
+    let criticidad = "-";
+    let baseScore = 0;
+
+    if (tipo === "Run") {
+      criticidad = "P1";
+      baseScore = 100;
+    } else if (tipo === "Build") {
+      criticidad = "P2";
+      baseScore = 90;
+    } else if (tipo === "Presentation" || tipo === "Presentación") {
+      criticidad = "P3";
+      baseScore = 80;
+    } else if (tipo === "PoC") {
+      criticidad = "P4";
+      baseScore = 70;
+    }
+
+    let score = baseScore;
+    let daysDiffMessage = "";
+
+    if (task.fechaFin) {
+      const today = new Date();
+      const end = new Date(task.fechaFin);
+
+      const d1 = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
+      const d2 = Date.UTC(end.getFullYear(), end.getMonth(), end.getDate());
+
+      const millisecondsPerDay = 1000 * 60 * 60 * 24;
+      const diffDays = Math.floor((d2 - d1) / millisecondsPerDay);
+
+      if (diffDays >= 0) {
+        score = baseScore - diffDays;
+        daysDiffMessage = `Quedan ${diffDays} día${diffDays === 1 ? '' : 's'}`;
+      } else {
+        const pastDays = Math.abs(diffDays);
+        score = baseScore + pastDays;
+        daysDiffMessage = `Vencido hace ${pastDays} día${pastDays === 1 ? '' : 's'}`;
+      }
+    }
+
+    return {
+      criticidad,
+      score,
+      daysDiffMessage,
+      dotColorClass: tipo === "PoC" ? "bg-indigo-300 border border-indigo-400"                       // Lavanda
+                   : tipo === "Presentation" || tipo === "Presentación" ? "bg-purple-200 border border-purple-300" // Morado clarito
+                   : tipo === "Build" ? "bg-amber-600 border border-amber-700"                   // Amarillo oscuro
+                   : tipo === "Run" ? "bg-red-400 border border-red-500"                         // Rojo tenue
+                   : "bg-zinc-350"
+    };
+  };
+
+  const filteredTasks = pendingTasks
+    .filter(task => {
+      const hasFechaFin = !!task.fechaFin;
+      const hasTipo = !!task.tipo;
+      const isPending = task.estado === "todo" || task.estado === "in_progress";
+      return hasFechaFin && hasTipo && isPending;
+    })
+    .map(task => {
+      const details = getTaskDetails(task);
+      const parentName = task.proyectoId 
+        ? (projectsMap[task.proyectoId] || "") 
+        : (task.iniciativaId ? (initiativesMap[task.iniciativaId] || "") : "");
+      const fullTitle = parentName ? `${parentName} - ${task.titulo}` : task.titulo;
+      return {
+        ...task,
+        ...details,
+        fullTitle
+      };
+    })
+    .sort((a, b) => b.score - a.score);
 
   return (
     <div className="max-w-6xl mx-auto space-y-8">
@@ -172,18 +273,74 @@ export const Dashboard: React.FC = () => {
             </div>
           </div>
 
-          <div className="p-6 border border-zinc-100 rounded-2xl bg-white shadow-sm">
-            <h3 className="font-bold mb-4">Accesos Rápidos</h3>
-            <div className="grid grid-cols-2 gap-3">
-              <Link to="/mailbox" className="p-3 bg-zinc-50 rounded-lg text-center hover:bg-zinc-100 transition-colors">
-                <MessageSquare size={20} className="mx-auto mb-1 text-purple-600" />
-                <span className="text-xs font-medium">Buzón</span>
-              </Link>
-              <Link to="/calendar" className="p-3 bg-zinc-50 rounded-lg text-center hover:bg-zinc-100 transition-colors">
-                <CalendarIcon size={20} className="mx-auto mb-1 text-amber-600" />
-                <span className="text-xs font-medium">Calendario</span>
-              </Link>
+          <div className="p-6 border border-zinc-100 rounded-2xl bg-white shadow-sm overflow-hidden">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-bold text-zinc-900 text-base">Tareas pendientes</h3>
+              <span className="text-[10px] bg-zinc-100 px-2.5 py-0.5 rounded-full text-zinc-500 font-bold">
+                {filteredTasks.length}
+              </span>
             </div>
+            
+            {filteredTasks.length === 0 ? (
+              <div className="text-center py-6 text-xs text-zinc-400">
+                No hay tareas pendientes.
+              </div>
+            ) : (
+              <div className="overflow-x-auto -mx-6">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="border-b border-zinc-100 text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                      <th className="px-6 py-2">Tarea</th>
+                      <th className="px-3 py-2 text-center">Crit.</th>
+                      <th className="px-6 py-2 text-right">Punt.</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-50">
+                    {filteredTasks.map((task) => (
+                      <tr key={task.id} className="hover:bg-zinc-50/50 transition-colors">
+                        <td className="px-6 py-3">
+                          <div className="flex items-center gap-2">
+                            <span 
+                              className={cn(
+                                "w-2.5 h-2.5 rounded-full shrink-0 shadow-sm",
+                                task.dotColorClass
+                              )}
+                              title={(task.tipo as string) === 'Presentation' || (task.tipo as string) === 'Presentación' ? 'Presentación' : task.tipo}
+                            />
+                            <div className="min-w-0 max-w-[120px] sm:max-w-[140px] md:max-w-[110px] lg:max-w-[130px]">
+                              <p className="text-xs font-semibold text-zinc-800 truncate" title={task.fullTitle}>
+                                {task.fullTitle}
+                              </p>
+                              {task.daysDiffMessage && (
+                                <p className="text-[9px] text-zinc-400 font-medium truncate">
+                                  {task.daysDiffMessage}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-3 py-3 text-center">
+                          <span className={cn(
+                            "text-[10px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider border shadow-xs",
+                            task.criticidad === "P1" && "bg-red-50 border-red-200 text-red-650",
+                            task.criticidad === "P2" && "bg-amber-100 border-amber-300 text-amber-800",
+                            task.criticidad === "P3" && "bg-purple-50 border-purple-200 text-purple-700",
+                            task.criticidad === "P4" && "bg-indigo-55 border-indigo-200 text-indigo-700"
+                          )}>
+                            {task.criticidad}
+                          </span>
+                        </td>
+                        <td className="px-6 py-3 text-right">
+                          <span className="text-xs font-bold font-mono text-zinc-900">
+                            {task.score}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
       </div>

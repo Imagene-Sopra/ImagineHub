@@ -8,6 +8,7 @@ import { ProjectDetail } from "./views/ProjectDetail";
 import { Mailbox } from "./views/Mailbox";
 import { CalendarView } from "./views/Calendar";
 import { Imagine } from "./views/Imagine";
+import { Roadmap } from "./views/Roadmap";
 
 export default function App() {
   return (
@@ -20,6 +21,7 @@ export default function App() {
           <Route path="initiatives/:id" element={<InitiativeDetail />} />
           <Route path="projects" element={<Projects />} />
           <Route path="projects/:id" element={<ProjectDetail />} />
+          <Route path="roadmap" element={<Roadmap />} />
           <Route path="mailbox" element={<Mailbox />} />
           <Route path="imagine" element={<Imagine />} />
         </Route>

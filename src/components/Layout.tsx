@@ -7,7 +7,8 @@ import {
   Mail, 
   Image as ImageIcon, 
   Bell,
-  Briefcase
+  Briefcase,
+  Map
 } from "lucide-react";
 import { cn } from "../lib/utils";
 
@@ -34,6 +35,7 @@ export const Layout: React.FC = () => {
     { to: "/calendar", icon: Calendar, label: "Calendario" },
     { to: "/initiatives", icon: Rocket, label: "Iniciativas" },
     { to: "/projects", icon: Briefcase, label: "Proyectos" },
+    { to: "/roadmap", icon: Map, label: "Roadmap" },
     { to: "/mailbox", icon: Mail, label: "Buzón" },
     { to: "/imagine", icon: ImageIcon, label: "Imagene V1" },
   ];
