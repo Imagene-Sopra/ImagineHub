@@ -99,6 +99,71 @@ export const Roadmap: React.FC = () => {
     }
   };
 
+  const getTaskDetails = (task: Task) => {
+    const tipo = (task.tipo as string) || "";
+    let criticidad = "-";
+    let baseScore = 0;
+
+    if (tipo === "Run") {
+      criticidad = "P1";
+      baseScore = 100;
+    } else if (tipo === "Build") {
+      criticidad = "P2";
+      baseScore = 90;
+    } else if (tipo === "Presentation" || tipo === "Presentación") {
+      criticidad = "P3";
+      baseScore = 80;
+    } else if (tipo === "PoC") {
+      criticidad = "P4";
+      baseScore = 70;
+    }
+
+    let score = baseScore;
+    let daysDiffMessage = "";
+
+    if (task.fechaFin) {
+      const today = new Date();
+      const end = new Date(task.fechaFin);
+
+      const d1 = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
+      const d2 = Date.UTC(end.getFullYear(), end.getMonth(), end.getDate());
+
+      const millisecondsPerDay = 1000 * 60 * 60 * 24;
+      const diffDays = Math.floor((d2 - d1) / millisecondsPerDay);
+
+      if (diffDays >= 0) {
+        score = baseScore - diffDays;
+        daysDiffMessage = `Quedan ${diffDays} día${diffDays === 1 ? "" : "s"}`;
+      } else {
+        const pastDays = Math.abs(diffDays);
+        score = baseScore + pastDays;
+        daysDiffMessage = `Vencido hace ${pastDays} día${pastDays === 1 ? "" : "s"}`;
+      }
+    }
+
+    return {
+      criticidad,
+      score,
+      daysDiffMessage,
+    };
+  };
+
+  const roadmapTasks = tasks
+    .map((task) => {
+      const details = getTaskDetails(task);
+      return {
+        ...task,
+        ...details,
+      };
+    })
+    .sort((a, b) => b.score - a.score);
+
+  const getTaskStatusLabel = (estado: Task["estado"]) => {
+    if (estado === "in_progress") return "En curso";
+    if (estado === "done") return "Completada";
+    return "Por iniciar";
+  };
+
   return (
     <div className="flex-1 flex flex-col h-full bg-zinc-50 overflow-hidden">
       <div className="p-8 border-b border-zinc-200 bg-white">
@@ -190,7 +255,7 @@ export const Roadmap: React.FC = () => {
 
               {/* Tasks with high visibility horizontal separation lines */}
               <div className="divide-y divide-zinc-200">
-                {tasks.map((task) => {
+                {roadmapTasks.map((task) => {
                   const pos = getTaskPosition(task);
                   if (!pos) return null;
                   const parentName = getParentName(task);
@@ -210,17 +275,16 @@ export const Roadmap: React.FC = () => {
                           </h4>
                         </div>
                         <div className="flex flex-wrap gap-1 items-center">
-                          {task.tipo && (
-                            <span className={cn(
-                              "text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider border shadow-sm",
-                              task.tipo === "PoC" && "bg-indigo-50 border-indigo-200 text-indigo-700",
-                              task.tipo === "Presentation" && "bg-purple-50 border-purple-200 text-purple-700",
-                              task.tipo === "Run" && "bg-red-50 border-red-200 text-red-600",
-                              task.tipo === "Build" && "bg-amber-100 border-amber-300 text-amber-800"
-                            )}>
-                              {task.tipo === "Presentation" ? "Presentación" : task.tipo}
-                            </span>
-                          )}
+                          <span className={cn(
+                            "text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider border shadow-sm",
+                            task.tipo === "PoC" && "bg-indigo-50 border-indigo-200 text-indigo-700",
+                            task.tipo === "Presentation" && "bg-purple-50 border-purple-200 text-purple-700",
+                            task.tipo === "Run" && "bg-red-50 border-red-200 text-red-600",
+                            task.tipo === "Build" && "bg-amber-100 border-amber-300 text-amber-800",
+                            !task.tipo && "bg-zinc-100 border-zinc-200 text-zinc-600"
+                          )}>
+                            Punt. {task.score}
+                          </span>
                           {task.tags?.slice(0, 2).map((tag, i) => (
                             <span key={i} className="text-[9px] bg-zinc-100 px-1 rounded text-zinc-500 border border-zinc-200/40">
                               {tag}
@@ -239,9 +303,11 @@ export const Roadmap: React.FC = () => {
                             left: pos.left, 
                             width: pos.width,
                           }}
-                          title={`${fullTitle} (${task.estado === 'todo' ? 'Por iniciar' : 'En curso'}) ${task.tipo ? `| Tipo: ${task.tipo === 'Presentation' ? 'Presentación' : task.tipo}` : ''}`}
+                          title={`${fullTitle} (${getTaskStatusLabel(task.estado)}) | Punt.: ${task.score}${task.tipo ? ` | Tipo: ${task.tipo === 'Presentation' ? 'Presentación' : task.tipo}` : ''}`}
                         >
-                          {/* Inside Task Bar is intentionally left empty as requested */}
+                          <span className="px-2 text-[9px] font-bold uppercase tracking-wide truncate max-w-full whitespace-nowrap">
+                            {getTaskStatusLabel(task.estado)}
+                          </span>
                         </div>
                       </div>
                     </div>

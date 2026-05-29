@@ -179,11 +179,32 @@ export const Dashboard: React.FC = () => {
     })
     .sort((a, b) => b.score - a.score);
 
+  const getTaskStatusMeta = (estado: Task["estado"]) => {
+    if (estado === "in_progress") {
+      return {
+        label: "En curso",
+        className: "bg-blue-50 border-blue-200 text-blue-700"
+      };
+    }
+
+    if (estado === "done") {
+      return {
+        label: "Completada",
+        className: "bg-emerald-50 border-emerald-200 text-emerald-700"
+      };
+    }
+
+    return {
+      label: "Pendiente",
+      className: "bg-zinc-100 border-zinc-200 text-zinc-700"
+    };
+  };
+
   return (
     <div className="max-w-6xl mx-auto space-y-8">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-8">
         {/* Left: Stats & Initiatives */}
-        <div className="md:col-span-2 space-y-8">
+        <div className="md:col-span-7 space-y-8">
           <section>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-bold tracking-tight">Últimas Iniciativas</h2>
@@ -249,7 +270,7 @@ export const Dashboard: React.FC = () => {
         </div>
 
         {/* Right: Quick Actions / Summary */}
-        <div className="space-y-8">
+        <div className="md:col-span-5 space-y-8">
           <div className="p-6 bg-zinc-900 rounded-2xl text-white shadow-xl">
             <h3 className="text-lg font-bold mb-2">Estado de la Compañía</h3>
             <p className="text-zinc-400 text-sm mb-6">Resumen rápido de lo que está pasando hoy.</p>
@@ -291,6 +312,7 @@ export const Dashboard: React.FC = () => {
                   <thead>
                     <tr className="border-b border-zinc-100 text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
                       <th className="px-6 py-2">Tarea</th>
+                      <th className="px-3 py-2 text-center">Estado</th>
                       <th className="px-3 py-2 text-center">Crit.</th>
                       <th className="px-6 py-2 text-right">Punt.</th>
                     </tr>
@@ -318,6 +340,14 @@ export const Dashboard: React.FC = () => {
                               )}
                             </div>
                           </div>
+                        </td>
+                        <td className="px-3 py-3 text-center">
+                          <span className={cn(
+                            "text-[10px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap",
+                            getTaskStatusMeta(task.estado).className
+                          )}>
+                            {getTaskStatusMeta(task.estado).label}
+                          </span>
                         </td>
                         <td className="px-3 py-3 text-center">
                           <span className={cn(
