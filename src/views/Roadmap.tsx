@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from "react";
-import { collectionGroup, query, onSnapshot, where, collection } from "firebase/firestore";
+import { collectionGroup, query, onSnapshot, where, collection, doc, updateDoc, deleteDoc } from "firebase/firestore";
 import { db } from "../firebase";
 import { Task } from "../types";
-import { Map, Calendar, Clock, Rocket, Briefcase } from "lucide-react";
+import { Map, Calendar, Clock, Rocket, Briefcase, AlertTriangle, ShieldAlert, Pencil } from "lucide-react";
 import { format, addMonths, startOfMonth, endOfMonth, eachMonthOfInterval, isWithinInterval, parseISO, isValid } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "../lib/utils";
+import { TaskModal } from "../components/TaskModal";
 
 export const Roadmap: React.FC = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -13,6 +14,8 @@ export const Roadmap: React.FC = () => {
   const [initiatives, setInitiatives] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [viewMonths] = useState(6); // Show 6 months roadmap
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
     // Include both 'todo' and 'in_progress' tasks
@@ -158,6 +161,35 @@ export const Roadmap: React.FC = () => {
     })
     .sort((a, b) => b.score - a.score);
 
+  const handleEditTask = (task: Task) => {
+    setSelectedTask(task);
+    setIsModalOpen(true);
+  };
+
+  const handleSaveTask = async (data: { titulo: string; descripcion: string; tags: string[]; fechaInicio?: string; fechaFin?: string; tipo?: "PoC" | "Presentation" | "Run" | "Build" | "" }) => {
+    if (!selectedTask) return;
+    const taskPath = selectedTask.iniciativaId
+      ? doc(db, "initiatives", selectedTask.iniciativaId, "tasks", selectedTask.id)
+      : selectedTask.proyectoId
+        ? doc(db, "projects", selectedTask.proyectoId, "tasks", selectedTask.id)
+        : null;
+    if (!taskPath) return;
+    await updateDoc(taskPath, { ...data, updatedAt: new Date().toISOString() });
+  };
+
+  const handleDeleteTask = async () => {
+    if (!selectedTask) return;
+    const taskPath = selectedTask.iniciativaId
+      ? doc(db, "initiatives", selectedTask.iniciativaId, "tasks", selectedTask.id)
+      : selectedTask.proyectoId
+        ? doc(db, "projects", selectedTask.proyectoId, "tasks", selectedTask.id)
+        : null;
+    if (!taskPath) return;
+    await deleteDoc(taskPath);
+    setIsModalOpen(false);
+    setSelectedTask(null);
+  };
+
   const getTaskStatusLabel = (estado: Task["estado"]) => {
     if (estado === "in_progress") return "En curso";
     if (estado === "done") return "Completada";
@@ -179,24 +211,12 @@ export const Roadmap: React.FC = () => {
           </div>
 
           {/* Core Legend of Types */}
-          <div className="flex flex-wrap items-center gap-3 bg-zinc-50 p-3 rounded-2xl border border-zinc-150">
+          <div className="flex flex-wrap items-center gap-2 bg-zinc-50 p-3 rounded-2xl border border-zinc-150">
             <span className="text-[10px] font-black uppercase text-zinc-400 tracking-wider mr-1">Leyenda:</span>
-            <div className="flex items-center gap-1.55">
-              <span className="w-2.5 h-2.5 rounded bg-indigo-250 inline-block border border-indigo-300 shadow-sm"></span>
-              <span className="text-xs font-semibold text-zinc-650">PoC</span>
-            </div>
-            <div className="flex items-center gap-1.55">
-              <span className="w-2.5 h-2.5 rounded bg-purple-200 inline-block border border-purple-300 shadow-sm"></span>
-              <span className="text-xs font-semibold text-zinc-650">Presentación</span>
-            </div>
-            <div className="flex items-center gap-1.55">
-              <span className="w-2.5 h-2.5 rounded bg-amber-100 inline-block border border-amber-400 shadow-sm"></span>
-              <span className="text-xs font-semibold text-zinc-650">Build</span>
-            </div>
-            <div className="flex items-center gap-1.55">
-              <span className="w-2.5 h-2.5 rounded bg-red-100/85 inline-block border border-red-300 shadow-sm"></span>
-              <span className="text-xs font-semibold text-zinc-650">Run</span>
-            </div>
+            <span className="text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider border shadow-sm bg-red-50 border-red-200 text-red-600">Run</span>
+            <span className="text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider border shadow-sm bg-amber-100 border-amber-300 text-amber-800">Build</span>
+            <span className="text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider border shadow-sm bg-purple-50 border-purple-200 text-purple-700">Presentación</span>
+            <span className="text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider border shadow-sm bg-indigo-50 border-indigo-200 text-indigo-700">PoC</span>
           </div>
         </div>
       </div>
@@ -270,21 +290,54 @@ export const Roadmap: React.FC = () => {
                           ) : (
                             <Rocket size={12} className="text-zinc-450" />
                           )}
-                          <h4 className="text-xs font-bold text-zinc-900 truncate" title={fullTitle}>
-                            {fullTitle}
-                          </h4>
+                          <button
+                            onClick={() => handleEditTask(task)}
+                            className="flex items-center gap-1 group/title min-w-0"
+                            title={`Editar: ${fullTitle}`}
+                          >
+                            <h4 className="text-xs font-bold text-zinc-900 truncate group-hover/title:text-blue-600 transition-colors">
+                              {fullTitle}
+                            </h4>
+                            <Pencil size={10} className="shrink-0 text-zinc-300 group-hover/title:text-blue-500 transition-colors" />
+                          </button>
                         </div>
                         <div className="flex flex-wrap gap-1 items-center">
-                          <span className={cn(
-                            "text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider border shadow-sm",
-                            task.tipo === "PoC" && "bg-indigo-50 border-indigo-200 text-indigo-700",
-                            task.tipo === "Presentation" && "bg-purple-50 border-purple-200 text-purple-700",
-                            task.tipo === "Run" && "bg-red-50 border-red-200 text-red-600",
-                            task.tipo === "Build" && "bg-amber-100 border-amber-300 text-amber-800",
-                            !task.tipo && "bg-zinc-100 border-zinc-200 text-zinc-600"
-                          )}>
-                            Punt. {task.score}
-                          </span>
+                          <div className="flex items-center gap-1">
+                            {task.tipo === "Run" && task.score > 100 && (
+                              <ShieldAlert size={12} className="shrink-0 text-red-600" />
+                            )}
+                            {task.tipo === "Run" && task.score >= 98 && task.score <= 100 && (
+                              <AlertTriangle size={12} className="shrink-0 text-orange-500" />
+                            )}
+                            {task.tipo === "Build" && task.score > 90 && (
+                              <ShieldAlert size={12} className="shrink-0 text-red-600" />
+                            )}
+                            {task.tipo === "Build" && task.score >= 88 && task.score <= 90 && (
+                              <AlertTriangle size={12} className="shrink-0 text-orange-500" />
+                            )}
+                            {task.tipo === "Presentation" && task.score > 80 && (
+                              <ShieldAlert size={12} className="shrink-0 text-red-600" />
+                            )}
+                            {task.tipo === "Presentation" && task.score >= 78 && task.score <= 80 && (
+                              <AlertTriangle size={12} className="shrink-0 text-orange-500" />
+                            )}
+                            {task.tipo === "PoC" && task.score > 70 && (
+                              <ShieldAlert size={12} className="shrink-0 text-red-600" />
+                            )}
+                            {task.tipo === "PoC" && task.score >= 68 && task.score <= 70 && (
+                              <AlertTriangle size={12} className="shrink-0 text-orange-500" />
+                            )}
+                            <span className={cn(
+                              "text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider border shadow-sm",
+                              task.tipo === "PoC" && "bg-indigo-50 border-indigo-200 text-indigo-700",
+                              task.tipo === "Presentation" && "bg-purple-50 border-purple-200 text-purple-700",
+                              task.tipo === "Run" && "bg-red-50 border-red-200 text-red-600",
+                              task.tipo === "Build" && "bg-amber-100 border-amber-300 text-amber-800",
+                              !task.tipo && "bg-zinc-100 border-zinc-200 text-zinc-600"
+                            )}>
+                              Punt. {task.score}
+                            </span>
+                          </div>
                           {task.tags?.slice(0, 2).map((tag, i) => (
                             <span key={i} className="text-[9px] bg-zinc-100 px-1 rounded text-zinc-500 border border-zinc-200/40">
                               {tag}
@@ -318,6 +371,24 @@ export const Roadmap: React.FC = () => {
           </div>
         )}
       </div>
+
+      {selectedTask && (
+        <TaskModal
+          isOpen={isModalOpen}
+          onClose={() => { setIsModalOpen(false); setSelectedTask(null); }}
+          onSave={handleSaveTask}
+          onDelete={handleDeleteTask}
+          contextType={selectedTask.proyectoId ? "project" : "initiative"}
+          initialData={{
+            titulo: selectedTask.titulo,
+            descripcion: selectedTask.descripcion || "",
+            tags: selectedTask.tags || [],
+            fechaInicio: selectedTask.fechaInicio,
+            fechaFin: selectedTask.fechaFin,
+            tipo: selectedTask.tipo,
+          }}
+        />
+      )}
     </div>
   );
 };

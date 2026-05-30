@@ -4,7 +4,7 @@ import { db } from "../firebase";
 import { News, Initiative, Task, Session } from "../types";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
-import { Rocket, CheckCircle2, MessageSquare, Calendar as CalendarIcon, ArrowRight } from "lucide-react";
+import { Rocket, CheckCircle2, MessageSquare, Calendar as CalendarIcon, ArrowRight, AlertTriangle, ShieldAlert } from "lucide-react";
 import { Link } from "react-router-dom";
 import { motion } from "motion/react";
 import { cn } from "../lib/utils";
@@ -200,6 +200,34 @@ export const Dashboard: React.FC = () => {
     };
   };
 
+  const getTaskScoreAlert = (tipo: Task["tipo"], score: number) => {
+    if (tipo === "Run") {
+      if (score > 100) return "danger";
+      if (score >= 98 && score <= 100) return "warning";
+      return null;
+    }
+
+    if (tipo === "Build") {
+      if (score > 90) return "danger";
+      if (score >= 88 && score <= 90) return "warning";
+      return null;
+    }
+
+    if (tipo === "Presentation") {
+      if (score > 80) return "danger";
+      if (score >= 78 && score <= 80) return "warning";
+      return null;
+    }
+
+    if (tipo === "PoC") {
+      if (score > 70) return "danger";
+      if (score >= 68 && score <= 70) return "warning";
+      return null;
+    }
+
+    return null;
+  };
+
   return (
     <div className="max-w-6xl mx-auto space-y-8">
       <div className="grid grid-cols-1 md:grid-cols-12 gap-8">
@@ -297,9 +325,17 @@ export const Dashboard: React.FC = () => {
           <div className="p-6 border border-zinc-100 rounded-2xl bg-white shadow-sm overflow-hidden">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-bold text-zinc-900 text-base">Tareas pendientes</h3>
-              <span className="text-[10px] bg-zinc-100 px-2.5 py-0.5 rounded-full text-zinc-500 font-bold">
-                {filteredTasks.length}
-              </span>
+              <div className="flex items-center gap-2">
+                <Link
+                  to="/roadmap"
+                  className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border border-zinc-200 text-zinc-600 hover:text-zinc-900 hover:border-zinc-300 transition-colors"
+                >
+                  Ver roadmap
+                </Link>
+                <span className="text-[10px] bg-zinc-100 px-2.5 py-0.5 rounded-full text-zinc-500 font-bold">
+                  {filteredTasks.length}
+                </span>
+              </div>
             </div>
             
             {filteredTasks.length === 0 ? (
@@ -361,9 +397,17 @@ export const Dashboard: React.FC = () => {
                           </span>
                         </td>
                         <td className="px-6 py-3 text-right">
-                          <span className="text-xs font-bold font-mono text-zinc-900">
-                            {task.score}
-                          </span>
+                          <div className="inline-flex items-center justify-end gap-1 max-w-full">
+                            {getTaskScoreAlert(task.tipo, task.score) === "danger" && (
+                              <ShieldAlert size={11} className="shrink-0 text-red-600" />
+                            )}
+                            {getTaskScoreAlert(task.tipo, task.score) === "warning" && (
+                              <AlertTriangle size={11} className="shrink-0 text-orange-500" />
+                            )}
+                            <span className="text-xs font-bold font-mono text-zinc-900">
+                              {task.score}
+                            </span>
+                          </div>
                         </td>
                       </tr>
                     ))}
