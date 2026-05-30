@@ -16,6 +16,7 @@ export const Roadmap: React.FC = () => {
   const [viewMonths] = useState(6); // Show 6 months roadmap
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedRoadmapFilters, setSelectedRoadmapFilters] = useState<string[]>([]);
 
   useEffect(() => {
     // Include both 'todo' and 'in_progress' tasks
@@ -161,6 +162,48 @@ export const Roadmap: React.FC = () => {
     })
     .sort((a, b) => b.score - a.score);
 
+  const ganttTasks = roadmapTasks.filter((task) => !!getTaskPosition(task));
+
+  const representedParentIds = new Set(
+    ganttTasks
+      .map((task) =>
+        task.proyectoId
+          ? `project:${task.proyectoId}`
+          : task.iniciativaId
+            ? `initiative:${task.iniciativaId}`
+            : null
+      )
+      .filter((value): value is string => !!value)
+  );
+
+  const roadmapFilterOptions = [
+    ...Object.entries(projects)
+      .filter(([id, name]) => !!name && representedParentIds.has(`project:${id}`))
+      .map(([id, name]) => ({ id: `project:${id}`, type: "project" as const, label: name })),
+    ...Object.entries(initiatives)
+      .filter(([id, name]) => !!name && representedParentIds.has(`initiative:${id}`))
+      .map(([id, name]) => ({ id: `initiative:${id}`, type: "initiative" as const, label: name }))
+  ].sort((a, b) => a.label.localeCompare(b.label, "es", { sensitivity: "base" }));
+
+  const filteredRoadmapTasks = ganttTasks.filter((task) => {
+    if (selectedRoadmapFilters.length === 0) return true;
+    const parentFilterId = task.proyectoId
+      ? `project:${task.proyectoId}`
+      : task.iniciativaId
+        ? `initiative:${task.iniciativaId}`
+        : null;
+    if (!parentFilterId) return false;
+    return selectedRoadmapFilters.includes(parentFilterId);
+  });
+
+  const toggleRoadmapFilter = (filterId: string) => {
+    setSelectedRoadmapFilters((prev) =>
+      prev.includes(filterId)
+        ? prev.filter((id) => id !== filterId)
+        : [...prev, filterId]
+    );
+  };
+
   const handleEditTask = (task: Task) => {
     setSelectedTask(task);
     setIsModalOpen(true);
@@ -210,13 +253,50 @@ export const Roadmap: React.FC = () => {
             </div>
           </div>
 
-          {/* Core Legend of Types */}
-          <div className="flex flex-wrap items-center gap-2 bg-zinc-50 p-3 rounded-2xl border border-zinc-150">
-            <span className="text-[10px] font-black uppercase text-zinc-400 tracking-wider mr-1">Leyenda:</span>
-            <span className="text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider border shadow-sm bg-red-50 border-red-200 text-red-600">Run</span>
-            <span className="text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider border shadow-sm bg-amber-100 border-amber-300 text-amber-800">Build</span>
-            <span className="text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider border shadow-sm bg-purple-50 border-purple-200 text-purple-700">Presentación</span>
-            <span className="text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider border shadow-sm bg-indigo-50 border-indigo-200 text-indigo-700">PoC</span>
+          <div className="flex flex-wrap items-center gap-3">
+            <details className="relative group">
+              <summary className="list-none cursor-pointer text-[10px] font-bold uppercase tracking-wider px-2.5 py-1.5 rounded-full border border-zinc-200 text-zinc-600 hover:text-zinc-900 hover:border-zinc-300 bg-white transition-colors">
+                Filtrar
+                {selectedRoadmapFilters.length > 0 && (
+                  <span className="ml-1.5 inline-flex items-center justify-center min-w-4 h-4 px-1 rounded-full bg-zinc-900 text-white text-[9px] leading-none">
+                    {selectedRoadmapFilters.length}
+                  </span>
+                )}
+              </summary>
+              <div className="absolute right-0 top-full mt-2 w-72 max-h-64 overflow-auto rounded-xl border border-zinc-200 bg-white shadow-xl z-20 p-2">
+                <div className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                  Proyectos e iniciativas
+                </div>
+                {roadmapFilterOptions.length === 0 ? (
+                  <div className="px-2 py-2 text-xs text-zinc-500">No hay elementos para filtrar.</div>
+                ) : (
+                  roadmapFilterOptions.map((option) => (
+                    <label
+                      key={option.id}
+                      className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-zinc-50 cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedRoadmapFilters.includes(option.id)}
+                        onChange={() => toggleRoadmapFilter(option.id)}
+                        className="rounded border-zinc-300 text-zinc-900 focus:ring-zinc-400"
+                      />
+                      <span className="text-xs text-zinc-700 truncate">{option.label}</span>
+                      <span className="text-[9px] text-zinc-400 uppercase ml-auto">{option.type === "project" ? "Proyecto" : "Iniciativa"}</span>
+                    </label>
+                  ))
+                )}
+              </div>
+            </details>
+
+            {/* Core Legend of Types */}
+            <div className="flex flex-wrap items-center gap-2 bg-zinc-50 p-3 rounded-2xl border border-zinc-150">
+              <span className="text-[10px] font-black uppercase text-zinc-400 tracking-wider mr-1">Leyenda:</span>
+              <span className="text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider border shadow-sm bg-red-50 border-red-200 text-red-600">Run</span>
+              <span className="text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider border shadow-sm bg-amber-100 border-amber-300 text-amber-800">Build</span>
+              <span className="text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider border shadow-sm bg-purple-50 border-purple-200 text-purple-700">Presentación</span>
+              <span className="text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider border shadow-sm bg-indigo-50 border-indigo-200 text-indigo-700">PoC</span>
+            </div>
           </div>
         </div>
       </div>
@@ -275,7 +355,7 @@ export const Roadmap: React.FC = () => {
 
               {/* Tasks with high visibility horizontal separation lines */}
               <div className="divide-y divide-zinc-200">
-                {roadmapTasks.map((task) => {
+                {filteredRoadmapTasks.map((task) => {
                   const pos = getTaskPosition(task);
                   if (!pos) return null;
                   const parentName = getParentName(task);
