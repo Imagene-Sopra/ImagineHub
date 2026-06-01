@@ -3,12 +3,15 @@ import { collectionGroup, query, onSnapshot, where, collection, doc, updateDoc, 
 import { db } from "../firebase";
 import { Task } from "../types";
 import { Map, Calendar, Clock, Rocket, Briefcase, AlertTriangle, ShieldAlert, Pencil } from "lucide-react";
-import { format, startOfMonth, endOfMonth, eachMonthOfInterval, isWithinInterval, parseISO, isValid } from "date-fns";
+import { format, addMonths, startOfMonth, endOfMonth, eachMonthOfInterval, isWithinInterval, parseISO, isValid } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "../lib/utils";
 import { TaskModal } from "../components/TaskModal";
 
 export const Roadmap: React.FC = () => {
+  const MONTH_COLUMN_WIDTH = 176;
+  const MIN_VISIBLE_MONTHS = 6;
+
   const [tasks, setTasks] = useState<Task[]>([]);
   const [projects, setProjects] = useState<Record<string, string>>({});
   const [initiatives, setInitiatives] = useState<Record<string, string>>({});
@@ -16,6 +19,14 @@ export const Roadmap: React.FC = () => {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedRoadmapFilters, setSelectedRoadmapFilters] = useState<string[]>([]);
+
+  const parseTaskDate = (value?: string) => {
+    if (!value) return null;
+    const isoDate = parseISO(value);
+    if (isValid(isoDate)) return isoDate;
+    const fallbackDate = new Date(value);
+    return isValid(fallbackDate) ? fallbackDate : null;
+  };
 
   useEffect(() => {
     // Include both 'todo' and 'in_progress' tasks
@@ -63,9 +74,8 @@ export const Roadmap: React.FC = () => {
   const { startDate, endDate, months } = useMemo(() => {
     const taskDates = tasks
       .flatMap((task) => [task.fechaInicio, task.fechaFin])
-      .filter((value): value is string => !!value)
-      .map((value) => parseISO(value))
-      .filter((date) => isValid(date));
+      .map((value) => parseTaskDate(value))
+      .filter((date): date is Date => !!date);
 
     if (taskDates.length === 0) {
       const now = new Date();
@@ -88,26 +98,39 @@ export const Roadmap: React.FC = () => {
 
     const rangeStart = startOfMonth(minDate);
     const rangeEnd = endOfMonth(maxDate);
+    const minEndByWindow = endOfMonth(addMonths(rangeStart, MIN_VISIBLE_MONTHS - 1));
+    const finalEnd = minEndByWindow.getTime() > rangeEnd.getTime() ? minEndByWindow : rangeEnd;
 
     return {
       startDate: rangeStart,
-      endDate: rangeEnd,
-      months: eachMonthOfInterval({ start: rangeStart, end: rangeEnd }),
+      endDate: finalEnd,
+      months: eachMonthOfInterval({ start: rangeStart, end: finalEnd }),
     };
   }, [tasks]);
+
+  const roadmapRangeLabel =
+    months.length > 0
+      ? `${format(months[0], "MMMM yyyy", { locale: es })} - ${format(months[months.length - 1], "MMMM yyyy", { locale: es })}`
+      : "";
+
+  const timelineGridTemplate = `repeat(${months.length}, minmax(${MONTH_COLUMN_WIDTH}px, 1fr))`;
 
   const getTaskPosition = (task: Task) => {
     if (!task.fechaInicio && !task.fechaFin) return null;
 
-    const tStart = task.fechaInicio ? parseISO(task.fechaInicio) : parseISO(task.fechaFin!);
-    const tEnd = task.fechaFin ? parseISO(task.fechaFin) : parseISO(task.fechaInicio!);
+    const tStart = task.fechaInicio ? parseTaskDate(task.fechaInicio) : parseTaskDate(task.fechaFin);
+    const tEnd = task.fechaFin ? parseTaskDate(task.fechaFin) : parseTaskDate(task.fechaInicio);
 
-    if (!isValid(tStart) || !isValid(tEnd)) return null;
+    if (!tStart || !tEnd) return null;
 
     const totalDays = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24);
+    if (totalDays <= 0) return null;
     
     // Clamp to roadmap bounds
-    const startOffset = Math.max(0, (tStart.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+    const startOffset = Math.min(
+      totalDays,
+      Math.max(0, (tStart.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
+    );
     const endOffset = Math.min(totalDays, (tEnd.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
 
     if (startOffset > totalDays || endOffset < 0) return null;
@@ -281,6 +304,7 @@ export const Roadmap: React.FC = () => {
             <div>
               <h1 className="text-2xl font-bold text-zinc-900">Roadmap de Tareas</h1>
               <p className="text-zinc-500 text-sm">Visualización temporal de tareas por iniciar y en curso</p>
+              <p className="text-zinc-400 text-xs mt-1 capitalize">Rango visible: {roadmapRangeLabel}</p>
             </div>
           </div>
 
@@ -351,12 +375,17 @@ export const Roadmap: React.FC = () => {
                   <div className="w-64 border-r border-zinc-200 p-4 font-bold text-zinc-500 text-xs uppercase tracking-wider sticky left-0 bg-white z-10">
                     Tarea / Proyecto
                   </div>
-                  {months.map((month, idx) => (
-                    <div key={idx} className="w-44 shrink-0 p-4 border-r border-zinc-200 text-center font-bold text-zinc-900 border-b-2 border-transparent">
-                      <span className="capitalize">{format(month, "MMMM", { locale: es })}</span>
-                      <span className="text-[10px] text-zinc-400 block tracking-widest">{format(month, "yyyy")}</span>
-                    </div>
-                  ))}
+                  <div className="grid flex-1" style={{ gridTemplateColumns: timelineGridTemplate }}>
+                    {months.map((month, idx) => (
+                      <div
+                        key={idx}
+                        className="p-4 border-r border-zinc-200 text-center font-bold text-zinc-900 border-b-2 border-transparent"
+                      >
+                        <span className="capitalize">{format(month, "MMMM", { locale: es })}</span>
+                        <span className="text-[10px] text-zinc-400 block tracking-widest">{format(month, "yyyy")}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
                 {/* Timeline View */}
@@ -364,15 +393,17 @@ export const Roadmap: React.FC = () => {
                   {/* Grid Lines with high visibility */}
                   <div className="absolute inset-0 flex pointer-events-none">
                     <div className="w-64 border-r border-zinc-200 sticky left-0 bg-white z-10 transition-colors"></div>
-                    {months.map((_, idx) => (
-                      <div key={idx} className="w-44 shrink-0 border-r border-zinc-200/70"></div>
-                    ))}
+                    <div className="grid flex-1" style={{ gridTemplateColumns: timelineGridTemplate }}>
+                      {months.map((_, idx) => (
+                        <div key={idx} className="border-r border-zinc-200/70"></div>
+                      ))}
+                    </div>
                   </div>
 
                   {/* Today Line Overlay */}
                   <div className="absolute inset-y-0 left-0 right-0 pointer-events-none flex" style={{ zIndex: 5 }}>
                     <div className="w-64 sticky left-0 bg-transparent flex-shrink-0"></div>
-                    <div className="flex-1 relative h-full">
+                    <div className="flex-1 relative h-full min-w-0">
                       <div
                         className="absolute inset-y-0 w-0.5 bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.4)] flex flex-col items-center"
                         style={{
@@ -459,7 +490,7 @@ export const Roadmap: React.FC = () => {
                             </div>
                           </div>
 
-                          <div className="flex-1 relative h-12 flex items-center bg-zinc-50/20">
+                          <div className="flex-1 relative h-12 flex items-center bg-zinc-50/20 min-w-0">
                             <div
                               className={cn(
                                 "absolute h-6 rounded-lg shadow-sm flex items-center justify-center border transition-all cursor-pointer",
