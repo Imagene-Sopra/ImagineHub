@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from "react";
-import { collectionGroup, query, onSnapshot, where, collection } from "firebase/firestore";
+import { collectionGroup, query, onSnapshot, where, collection, doc, updateDoc, deleteDoc } from "firebase/firestore";
 import { db } from "../firebase";
 import { Task } from "../types";
-import { Map, Calendar, Clock, Rocket, Briefcase } from "lucide-react";
+import { Map, Calendar, Clock, Rocket, Briefcase, AlertTriangle, ShieldAlert, Pencil } from "lucide-react";
 import { format, addMonths, startOfMonth, endOfMonth, eachMonthOfInterval, isWithinInterval, parseISO, isValid } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "../lib/utils";
+import { TaskModal } from "../components/TaskModal";
 
 export const Roadmap: React.FC = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -13,6 +14,9 @@ export const Roadmap: React.FC = () => {
   const [initiatives, setInitiatives] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [viewMonths] = useState(6); // Show 6 months roadmap
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedRoadmapFilters, setSelectedRoadmapFilters] = useState<string[]>([]);
 
   useEffect(() => {
     // Include both 'todo' and 'in_progress' tasks
@@ -99,6 +103,142 @@ export const Roadmap: React.FC = () => {
     }
   };
 
+  const getTaskDetails = (task: Task) => {
+    const tipo = (task.tipo as string) || "";
+    let criticidad = "-";
+    let baseScore = 0;
+
+    if (tipo === "Run") {
+      criticidad = "P1";
+      baseScore = 100;
+    } else if (tipo === "Build") {
+      criticidad = "P2";
+      baseScore = 90;
+    } else if (tipo === "Presentation" || tipo === "Presentación") {
+      criticidad = "P3";
+      baseScore = 80;
+    } else if (tipo === "PoC") {
+      criticidad = "P4";
+      baseScore = 70;
+    }
+
+    let score = baseScore;
+    let daysDiffMessage = "";
+
+    if (task.fechaFin) {
+      const today = new Date();
+      const end = new Date(task.fechaFin);
+
+      const d1 = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
+      const d2 = Date.UTC(end.getFullYear(), end.getMonth(), end.getDate());
+
+      const millisecondsPerDay = 1000 * 60 * 60 * 24;
+      const diffDays = Math.floor((d2 - d1) / millisecondsPerDay);
+
+      if (diffDays >= 0) {
+        score = baseScore - diffDays;
+        daysDiffMessage = `Quedan ${diffDays} día${diffDays === 1 ? "" : "s"}`;
+      } else {
+        const pastDays = Math.abs(diffDays);
+        score = baseScore + pastDays;
+        daysDiffMessage = `Vencido hace ${pastDays} día${pastDays === 1 ? "" : "s"}`;
+      }
+    }
+
+    return {
+      criticidad,
+      score,
+      daysDiffMessage,
+    };
+  };
+
+  const roadmapTasks = tasks
+    .map((task) => {
+      const details = getTaskDetails(task);
+      return {
+        ...task,
+        ...details,
+      };
+    })
+    .sort((a, b) => b.score - a.score);
+
+  const ganttTasks = roadmapTasks.filter((task) => !!getTaskPosition(task));
+
+  const representedParentIds = new Set(
+    ganttTasks
+      .map((task) =>
+        task.proyectoId
+          ? `project:${task.proyectoId}`
+          : task.iniciativaId
+            ? `initiative:${task.iniciativaId}`
+            : null
+      )
+      .filter((value): value is string => !!value)
+  );
+
+  const roadmapFilterOptions = [
+    ...Object.entries(projects)
+      .filter(([id, name]) => !!name && representedParentIds.has(`project:${id}`))
+      .map(([id, name]) => ({ id: `project:${id}`, type: "project" as const, label: name })),
+    ...Object.entries(initiatives)
+      .filter(([id, name]) => !!name && representedParentIds.has(`initiative:${id}`))
+      .map(([id, name]) => ({ id: `initiative:${id}`, type: "initiative" as const, label: name }))
+  ].sort((a, b) => a.label.localeCompare(b.label, "es", { sensitivity: "base" }));
+
+  const filteredRoadmapTasks = ganttTasks.filter((task) => {
+    if (selectedRoadmapFilters.length === 0) return true;
+    const parentFilterId = task.proyectoId
+      ? `project:${task.proyectoId}`
+      : task.iniciativaId
+        ? `initiative:${task.iniciativaId}`
+        : null;
+    if (!parentFilterId) return false;
+    return selectedRoadmapFilters.includes(parentFilterId);
+  });
+
+  const toggleRoadmapFilter = (filterId: string) => {
+    setSelectedRoadmapFilters((prev) =>
+      prev.includes(filterId)
+        ? prev.filter((id) => id !== filterId)
+        : [...prev, filterId]
+    );
+  };
+
+  const handleEditTask = (task: Task) => {
+    setSelectedTask(task);
+    setIsModalOpen(true);
+  };
+
+  const handleSaveTask = async (data: { titulo: string; descripcion: string; tags: string[]; fechaInicio?: string; fechaFin?: string; tipo?: "PoC" | "Presentation" | "Run" | "Build" | "" }) => {
+    if (!selectedTask) return;
+    const taskPath = selectedTask.iniciativaId
+      ? doc(db, "initiatives", selectedTask.iniciativaId, "tasks", selectedTask.id)
+      : selectedTask.proyectoId
+        ? doc(db, "projects", selectedTask.proyectoId, "tasks", selectedTask.id)
+        : null;
+    if (!taskPath) return;
+    await updateDoc(taskPath, { ...data, updatedAt: new Date().toISOString() });
+  };
+
+  const handleDeleteTask = async () => {
+    if (!selectedTask) return;
+    const taskPath = selectedTask.iniciativaId
+      ? doc(db, "initiatives", selectedTask.iniciativaId, "tasks", selectedTask.id)
+      : selectedTask.proyectoId
+        ? doc(db, "projects", selectedTask.proyectoId, "tasks", selectedTask.id)
+        : null;
+    if (!taskPath) return;
+    await deleteDoc(taskPath);
+    setIsModalOpen(false);
+    setSelectedTask(null);
+  };
+
+  const getTaskStatusLabel = (estado: Task["estado"]) => {
+    if (estado === "in_progress") return "En curso";
+    if (estado === "done") return "Completada";
+    return "Por iniciar";
+  };
+
   return (
     <div className="flex-1 flex flex-col h-full bg-zinc-50 overflow-hidden">
       <div className="p-8 border-b border-zinc-200 bg-white">
@@ -113,24 +253,49 @@ export const Roadmap: React.FC = () => {
             </div>
           </div>
 
-          {/* Core Legend of Types */}
-          <div className="flex flex-wrap items-center gap-3 bg-zinc-50 p-3 rounded-2xl border border-zinc-150">
-            <span className="text-[10px] font-black uppercase text-zinc-400 tracking-wider mr-1">Leyenda:</span>
-            <div className="flex items-center gap-1.55">
-              <span className="w-2.5 h-2.5 rounded bg-indigo-250 inline-block border border-indigo-300 shadow-sm"></span>
-              <span className="text-xs font-semibold text-zinc-650">PoC</span>
-            </div>
-            <div className="flex items-center gap-1.55">
-              <span className="w-2.5 h-2.5 rounded bg-purple-200 inline-block border border-purple-300 shadow-sm"></span>
-              <span className="text-xs font-semibold text-zinc-650">Presentación</span>
-            </div>
-            <div className="flex items-center gap-1.55">
-              <span className="w-2.5 h-2.5 rounded bg-amber-100 inline-block border border-amber-400 shadow-sm"></span>
-              <span className="text-xs font-semibold text-zinc-650">Build</span>
-            </div>
-            <div className="flex items-center gap-1.55">
-              <span className="w-2.5 h-2.5 rounded bg-red-100/85 inline-block border border-red-300 shadow-sm"></span>
-              <span className="text-xs font-semibold text-zinc-650">Run</span>
+          <div className="flex flex-wrap items-center gap-3">
+            <details className="relative group">
+              <summary className="list-none cursor-pointer text-[10px] font-bold uppercase tracking-wider px-2.5 py-1.5 rounded-full border border-zinc-200 text-zinc-600 hover:text-zinc-900 hover:border-zinc-300 bg-white transition-colors">
+                Filtrar
+                {selectedRoadmapFilters.length > 0 && (
+                  <span className="ml-1.5 inline-flex items-center justify-center min-w-4 h-4 px-1 rounded-full bg-zinc-900 text-white text-[9px] leading-none">
+                    {selectedRoadmapFilters.length}
+                  </span>
+                )}
+              </summary>
+              <div className="absolute right-0 top-full mt-2 w-72 max-h-64 overflow-auto rounded-xl border border-zinc-200 bg-white shadow-xl z-20 p-2">
+                <div className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                  Proyectos e iniciativas
+                </div>
+                {roadmapFilterOptions.length === 0 ? (
+                  <div className="px-2 py-2 text-xs text-zinc-500">No hay elementos para filtrar.</div>
+                ) : (
+                  roadmapFilterOptions.map((option) => (
+                    <label
+                      key={option.id}
+                      className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-zinc-50 cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedRoadmapFilters.includes(option.id)}
+                        onChange={() => toggleRoadmapFilter(option.id)}
+                        className="rounded border-zinc-300 text-zinc-900 focus:ring-zinc-400"
+                      />
+                      <span className="text-xs text-zinc-700 truncate">{option.label}</span>
+                      <span className="text-[9px] text-zinc-400 uppercase ml-auto">{option.type === "project" ? "Proyecto" : "Iniciativa"}</span>
+                    </label>
+                  ))
+                )}
+              </div>
+            </details>
+
+            {/* Core Legend of Types */}
+            <div className="flex flex-wrap items-center gap-2 bg-zinc-50 p-3 rounded-2xl border border-zinc-150">
+              <span className="text-[10px] font-black uppercase text-zinc-400 tracking-wider mr-1">Leyenda:</span>
+              <span className="text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider border shadow-sm bg-red-50 border-red-200 text-red-600">Run</span>
+              <span className="text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider border shadow-sm bg-amber-100 border-amber-300 text-amber-800">Build</span>
+              <span className="text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider border shadow-sm bg-purple-50 border-purple-200 text-purple-700">Presentación</span>
+              <span className="text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider border shadow-sm bg-indigo-50 border-indigo-200 text-indigo-700">PoC</span>
             </div>
           </div>
         </div>
@@ -190,7 +355,7 @@ export const Roadmap: React.FC = () => {
 
               {/* Tasks with high visibility horizontal separation lines */}
               <div className="divide-y divide-zinc-200">
-                {tasks.map((task) => {
+                {filteredRoadmapTasks.map((task) => {
                   const pos = getTaskPosition(task);
                   if (!pos) return null;
                   const parentName = getParentName(task);
@@ -205,22 +370,54 @@ export const Roadmap: React.FC = () => {
                           ) : (
                             <Rocket size={12} className="text-zinc-450" />
                           )}
-                          <h4 className="text-xs font-bold text-zinc-900 truncate" title={fullTitle}>
-                            {fullTitle}
-                          </h4>
+                          <button
+                            onClick={() => handleEditTask(task)}
+                            className="flex items-center gap-1 group/title min-w-0"
+                            title={`Editar: ${fullTitle}`}
+                          >
+                            <h4 className="text-xs font-bold text-zinc-900 truncate group-hover/title:text-blue-600 transition-colors">
+                              {fullTitle}
+                            </h4>
+                            <Pencil size={10} className="shrink-0 text-zinc-300 group-hover/title:text-blue-500 transition-colors" />
+                          </button>
                         </div>
                         <div className="flex flex-wrap gap-1 items-center">
-                          {task.tipo && (
+                          <div className="flex items-center gap-1">
+                            {task.tipo === "Run" && task.score > 100 && (
+                              <ShieldAlert size={12} className="shrink-0 text-red-600" />
+                            )}
+                            {task.tipo === "Run" && task.score >= 98 && task.score <= 100 && (
+                              <AlertTriangle size={12} className="shrink-0 text-orange-500" />
+                            )}
+                            {task.tipo === "Build" && task.score > 90 && (
+                              <ShieldAlert size={12} className="shrink-0 text-red-600" />
+                            )}
+                            {task.tipo === "Build" && task.score >= 88 && task.score <= 90 && (
+                              <AlertTriangle size={12} className="shrink-0 text-orange-500" />
+                            )}
+                            {task.tipo === "Presentation" && task.score > 80 && (
+                              <ShieldAlert size={12} className="shrink-0 text-red-600" />
+                            )}
+                            {task.tipo === "Presentation" && task.score >= 78 && task.score <= 80 && (
+                              <AlertTriangle size={12} className="shrink-0 text-orange-500" />
+                            )}
+                            {task.tipo === "PoC" && task.score > 70 && (
+                              <ShieldAlert size={12} className="shrink-0 text-red-600" />
+                            )}
+                            {task.tipo === "PoC" && task.score >= 68 && task.score <= 70 && (
+                              <AlertTriangle size={12} className="shrink-0 text-orange-500" />
+                            )}
                             <span className={cn(
                               "text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider border shadow-sm",
                               task.tipo === "PoC" && "bg-indigo-50 border-indigo-200 text-indigo-700",
                               task.tipo === "Presentation" && "bg-purple-50 border-purple-200 text-purple-700",
                               task.tipo === "Run" && "bg-red-50 border-red-200 text-red-600",
-                              task.tipo === "Build" && "bg-amber-100 border-amber-300 text-amber-800"
+                              task.tipo === "Build" && "bg-amber-100 border-amber-300 text-amber-800",
+                              !task.tipo && "bg-zinc-100 border-zinc-200 text-zinc-600"
                             )}>
-                              {task.tipo === "Presentation" ? "Presentación" : task.tipo}
+                              Punt. {task.score}
                             </span>
-                          )}
+                          </div>
                           {task.tags?.slice(0, 2).map((tag, i) => (
                             <span key={i} className="text-[9px] bg-zinc-100 px-1 rounded text-zinc-500 border border-zinc-200/40">
                               {tag}
@@ -239,9 +436,11 @@ export const Roadmap: React.FC = () => {
                             left: pos.left, 
                             width: pos.width,
                           }}
-                          title={`${fullTitle} (${task.estado === 'todo' ? 'Por iniciar' : 'En curso'}) ${task.tipo ? `| Tipo: ${task.tipo === 'Presentation' ? 'Presentación' : task.tipo}` : ''}`}
+                          title={`${fullTitle} (${getTaskStatusLabel(task.estado)}) | Punt.: ${task.score}${task.tipo ? ` | Tipo: ${task.tipo === 'Presentation' ? 'Presentación' : task.tipo}` : ''}`}
                         >
-                          {/* Inside Task Bar is intentionally left empty as requested */}
+                          <span className="px-2 text-[9px] font-bold uppercase tracking-wide truncate max-w-full whitespace-nowrap">
+                            {getTaskStatusLabel(task.estado)}
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -252,6 +451,24 @@ export const Roadmap: React.FC = () => {
           </div>
         )}
       </div>
+
+      {selectedTask && (
+        <TaskModal
+          isOpen={isModalOpen}
+          onClose={() => { setIsModalOpen(false); setSelectedTask(null); }}
+          onSave={handleSaveTask}
+          onDelete={handleDeleteTask}
+          contextType={selectedTask.proyectoId ? "project" : "initiative"}
+          initialData={{
+            titulo: selectedTask.titulo,
+            descripcion: selectedTask.descripcion || "",
+            tags: selectedTask.tags || [],
+            fechaInicio: selectedTask.fechaInicio,
+            fechaFin: selectedTask.fechaFin,
+            tipo: selectedTask.tipo,
+          }}
+        />
+      )}
     </div>
   );
 };

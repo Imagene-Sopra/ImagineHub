@@ -32,11 +32,11 @@ export const Layout: React.FC = () => {
 
   const menuItems = [
     { to: "/", icon: Home, label: "Home" },
-    { to: "/calendar", icon: Calendar, label: "Calendario" },
+    { to: "/roadmap", icon: Map, label: "Roadmap" },
     { to: "/initiatives", icon: Rocket, label: "Iniciativas" },
     { to: "/projects", icon: Briefcase, label: "Proyectos" },
-    { to: "/roadmap", icon: Map, label: "Roadmap" },
     { to: "/mailbox", icon: Mail, label: "Buzón" },
+    { to: "/calendar", icon: Calendar, label: "Calendario" },
     { to: "/imagine", icon: ImageIcon, label: "Imagene V1" },
   ];
 

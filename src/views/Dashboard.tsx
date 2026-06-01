@@ -4,7 +4,7 @@ import { db } from "../firebase";
 import { News, Initiative, Task, Session } from "../types";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
-import { Rocket, CheckCircle2, MessageSquare, Calendar as CalendarIcon, ArrowRight } from "lucide-react";
+import { Rocket, CheckCircle2, MessageSquare, Calendar as CalendarIcon, ArrowRight, AlertTriangle, ShieldAlert } from "lucide-react";
 import { Link } from "react-router-dom";
 import { motion } from "motion/react";
 import { cn } from "../lib/utils";
@@ -179,11 +179,60 @@ export const Dashboard: React.FC = () => {
     })
     .sort((a, b) => b.score - a.score);
 
+  const getTaskStatusMeta = (estado: Task["estado"]) => {
+    if (estado === "in_progress") {
+      return {
+        label: "En curso",
+        className: "bg-blue-50 border-blue-200 text-blue-700"
+      };
+    }
+
+    if (estado === "done") {
+      return {
+        label: "Completada",
+        className: "bg-emerald-50 border-emerald-200 text-emerald-700"
+      };
+    }
+
+    return {
+      label: "Pendiente",
+      className: "bg-zinc-100 border-zinc-200 text-zinc-700"
+    };
+  };
+
+  const getTaskScoreAlert = (tipo: Task["tipo"], score: number) => {
+    if (tipo === "Run") {
+      if (score > 100) return "danger";
+      if (score >= 98 && score <= 100) return "warning";
+      return null;
+    }
+
+    if (tipo === "Build") {
+      if (score > 90) return "danger";
+      if (score >= 88 && score <= 90) return "warning";
+      return null;
+    }
+
+    if (tipo === "Presentation") {
+      if (score > 80) return "danger";
+      if (score >= 78 && score <= 80) return "warning";
+      return null;
+    }
+
+    if (tipo === "PoC") {
+      if (score > 70) return "danger";
+      if (score >= 68 && score <= 70) return "warning";
+      return null;
+    }
+
+    return null;
+  };
+
   return (
     <div className="max-w-6xl mx-auto space-y-8">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-8">
         {/* Left: Stats & Initiatives */}
-        <div className="md:col-span-2 space-y-8">
+        <div className="md:col-span-7 space-y-8">
           <section>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-bold tracking-tight">Últimas Iniciativas</h2>
@@ -249,7 +298,7 @@ export const Dashboard: React.FC = () => {
         </div>
 
         {/* Right: Quick Actions / Summary */}
-        <div className="space-y-8">
+        <div className="md:col-span-5 space-y-8">
           <div className="p-6 bg-zinc-900 rounded-2xl text-white shadow-xl">
             <h3 className="text-lg font-bold mb-2">Estado de la Compañía</h3>
             <p className="text-zinc-400 text-sm mb-6">Resumen rápido de lo que está pasando hoy.</p>
@@ -276,9 +325,17 @@ export const Dashboard: React.FC = () => {
           <div className="p-6 border border-zinc-100 rounded-2xl bg-white shadow-sm overflow-hidden">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-bold text-zinc-900 text-base">Tareas pendientes</h3>
-              <span className="text-[10px] bg-zinc-100 px-2.5 py-0.5 rounded-full text-zinc-500 font-bold">
-                {filteredTasks.length}
-              </span>
+              <div className="flex items-center gap-2">
+                <Link
+                  to="/roadmap"
+                  className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border border-zinc-200 text-zinc-600 hover:text-zinc-900 hover:border-zinc-300 transition-colors"
+                >
+                  Ver roadmap
+                </Link>
+                <span className="text-[10px] bg-zinc-100 px-2.5 py-0.5 rounded-full text-zinc-500 font-bold">
+                  {filteredTasks.length}
+                </span>
+              </div>
             </div>
             
             {filteredTasks.length === 0 ? (
@@ -291,6 +348,7 @@ export const Dashboard: React.FC = () => {
                   <thead>
                     <tr className="border-b border-zinc-100 text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
                       <th className="px-6 py-2">Tarea</th>
+                      <th className="px-3 py-2 text-center">Estado</th>
                       <th className="px-3 py-2 text-center">Crit.</th>
                       <th className="px-6 py-2 text-right">Punt.</th>
                     </tr>
@@ -321,6 +379,14 @@ export const Dashboard: React.FC = () => {
                         </td>
                         <td className="px-3 py-3 text-center">
                           <span className={cn(
+                            "text-[10px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap",
+                            getTaskStatusMeta(task.estado).className
+                          )}>
+                            {getTaskStatusMeta(task.estado).label}
+                          </span>
+                        </td>
+                        <td className="px-3 py-3 text-center">
+                          <span className={cn(
                             "text-[10px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider border shadow-xs",
                             task.criticidad === "P1" && "bg-red-50 border-red-200 text-red-650",
                             task.criticidad === "P2" && "bg-amber-100 border-amber-300 text-amber-800",
@@ -331,9 +397,17 @@ export const Dashboard: React.FC = () => {
                           </span>
                         </td>
                         <td className="px-6 py-3 text-right">
-                          <span className="text-xs font-bold font-mono text-zinc-900">
-                            {task.score}
-                          </span>
+                          <div className="inline-flex items-center justify-end gap-1 max-w-full">
+                            {getTaskScoreAlert(task.tipo, task.score) === "danger" && (
+                              <ShieldAlert size={11} className="shrink-0 text-red-600" />
+                            )}
+                            {getTaskScoreAlert(task.tipo, task.score) === "warning" && (
+                              <AlertTriangle size={11} className="shrink-0 text-orange-500" />
+                            )}
+                            <span className="text-xs font-bold font-mono text-zinc-900">
+                              {task.score}
+                            </span>
+                          </div>
                         </td>
                       </tr>
                     ))}
