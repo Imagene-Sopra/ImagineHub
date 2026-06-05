@@ -6,6 +6,7 @@ import { Rocket, Plus, Search, Calendar, Trash2, Pencil, User, X, CheckCircle2, 
 import { Link } from "react-router-dom";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { CONFIRM_DELETE_INITIATIVE } from "../lib/constants";
 import {
   DndContext,
   closestCenter,
@@ -116,20 +117,20 @@ const SortableInitiativeCard = ({ init, taskCounts, handleEdit, setShowDeleteCon
       {showDeleteConfirm === init.id && (
         <div className="absolute inset-0 bg-white/95 rounded-2xl flex items-center justify-center p-6 z-10 animate-in fade-in zoom-in duration-200">
           <div className="text-center">
-            <p className="font-bold text-zinc-900 mb-1">¿Eliminar iniciativa?</p>
-            <p className="text-xs text-zinc-500 mb-4">Esta acción no se puede deshacer.</p>
+            <p className="font-bold text-zinc-900 mb-1">{CONFIRM_DELETE_INITIATIVE.message}</p>
+            <p className="text-xs text-zinc-500 mb-4">{CONFIRM_DELETE_INITIATIVE.warning}</p>
             <div className="flex gap-2 justify-center">
               <button 
                 onClick={() => setShowDeleteConfirm(null)}
                 className="px-4 py-1.5 text-xs font-medium border border-zinc-200 rounded-lg hover:bg-zinc-50 transition-colors"
               >
-                Cancelar
+                {CONFIRM_DELETE_INITIATIVE.cancel}
               </button>
               <button 
                 onClick={() => handleDelete(init.id)}
                 className="px-4 py-1.5 text-xs font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors shadow-sm"
               >
-                Sí, eliminar
+                {CONFIRM_DELETE_INITIATIVE.accept}
               </button>
             </div>
           </div>
