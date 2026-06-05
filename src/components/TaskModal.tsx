@@ -26,6 +26,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSave, o
   const [startDate, setStartDate] = useState(initialData?.fechaInicio || "");
   const [endDate, setEndDate] = useState(initialData?.fechaFin || "");
   const [tipo, setTipo] = useState<"PoC" | "Presentation" | "Run" | "Build" | "">(initialData?.tipo as any || "");
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   React.useEffect(() => {
     if (isOpen) {
@@ -35,6 +36,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSave, o
       setStartDate(initialData?.fechaInicio || "");
       setEndDate(initialData?.fechaFin || "");
       setTipo(initialData?.tipo as any || "");
+      setShowDeleteConfirm(false);
     }
   }, [isOpen, initialData]);
 
@@ -88,10 +90,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSave, o
                 {initialData && onDelete && (
                   <button 
                     type="button"
-                    onClick={() => {
-                      onDelete();
-                      onClose();
-                    }}
+                    onClick={() => setShowDeleteConfirm(true)}
                     className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors"
                     title="Borrar tarea"
                   >
@@ -105,6 +104,28 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSave, o
             </div>
 
             <form onSubmit={handleSubmit} className="p-6 space-y-5 max-h-[70vh] overflow-y-auto">
+              {showDeleteConfirm && (
+                <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex flex-col gap-3">
+                  <p className="text-sm font-bold text-red-700">¿Eliminar esta tarea?</p>
+                  <p className="text-xs text-red-500">Esta acción no se puede deshacer.</p>
+                  <div className="flex gap-2 justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setShowDeleteConfirm(false)}
+                      className="px-4 py-2 text-xs font-bold border border-zinc-300 rounded-lg text-zinc-600 hover:bg-zinc-100 transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { onDelete!(); onClose(); }}
+                      className="px-4 py-2 text-xs font-bold bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                    >
+                      Aceptar
+                    </button>
+                  </div>
+                </div>
+              )}
               <div className="space-y-2">
                 <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">Título</label>
                 <input
