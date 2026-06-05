@@ -37,6 +37,7 @@ export interface Task {
   proyectoId?: string;
   creadorId: string;
   tags: string[];
+  asignadoA: string[];
   createdAt: string;
   updatedAt: string;
   orden?: number;

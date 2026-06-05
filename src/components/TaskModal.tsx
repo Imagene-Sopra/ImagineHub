@@ -1,18 +1,19 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { X, Plus, Tag as TagIcon, Trash2 } from "lucide-react";
-import { CONFIRM_DELETE_TASK } from "../lib/constants";
+import { X, Plus, Tag as TagIcon, Trash2, User } from "lucide-react";
+import { CONFIRM_DELETE_TASK, TASK_FIELDS } from "../lib/constants";
 
 interface TaskModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (data: { titulo: string; descripcion: string; tags: string[]; fechaInicio?: string; fechaFin?: string; tipo?: "PoC" | "Presentation" | "Run" | "Build" | "" }) => void;
+  onSave: (data: { titulo: string; descripcion: string; tags: string[]; asignadoA: string[]; fechaInicio?: string; fechaFin?: string; tipo?: "PoC" | "Presentation" | "Run" | "Build" | "" }) => void;
   onDelete?: () => void;
   contextType: "initiative" | "project";
   initialData?: {
     titulo: string;
     descripcion: string;
     tags: string[];
+    asignadoA?: string[];
     fechaInicio?: string;
     fechaFin?: string;
     tipo?: string;
@@ -24,6 +25,8 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSave, o
   const [description, setDescription] = useState(initialData?.descripcion || "");
   const [tagInput, setTagInput] = useState("");
   const [tags, setTags] = useState<string[]>(initialData?.tags || []);
+  const [assigneeInput, setAssigneeInput] = useState("");
+  const [asignadoA, setAsignadoA] = useState<string[]>(initialData?.asignadoA || []);
   const [startDate, setStartDate] = useState(initialData?.fechaInicio || "");
   const [endDate, setEndDate] = useState(initialData?.fechaFin || "");
   const [tipo, setTipo] = useState<"PoC" | "Presentation" | "Run" | "Build" | "">(initialData?.tipo as any || "");
@@ -34,6 +37,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSave, o
       setTitle(initialData?.titulo || "");
       setDescription(initialData?.descripcion || "");
       setTags(initialData?.tags || []);
+      setAsignadoA(initialData?.asignadoA || []);
       setStartDate(initialData?.fechaInicio || "");
       setEndDate(initialData?.fechaFin || "");
       setTipo(initialData?.tipo as any || "");
@@ -52,6 +56,17 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSave, o
     setTags(tags.filter(t => t !== tagToRemove));
   };
 
+  const handleAddAssignee = () => {
+    if (assigneeInput.trim() && !asignadoA.includes(assigneeInput.trim())) {
+      setAsignadoA([...asignadoA, assigneeInput.trim()]);
+      setAssigneeInput("");
+    }
+  };
+
+  const removeAssignee = (name: string) => {
+    setAsignadoA(asignadoA.filter(a => a !== name));
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (title.trim()) {
@@ -59,6 +74,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSave, o
         titulo: title.trim(),
         descripcion: description.trim(),
         tags,
+        asignadoA,
         fechaInicio: startDate,
         fechaFin: endDate,
         tipo
@@ -66,6 +82,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSave, o
       setTitle("");
       setDescription("");
       setTags([]);
+      setAsignadoA([]);
       setStartDate("");
       setEndDate("");
       setTipo("");
@@ -192,6 +209,46 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSave, o
                     </>
                   )}
                 </select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">{TASK_FIELDS.assignedTo}</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={assigneeInput}
+                    onChange={(e) => setAssigneeInput(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddAssignee())}
+                    placeholder={TASK_FIELDS.assignedToPlaceholder}
+                    className="flex-1 px-4 py-2 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:border-zinc-900 transition-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddAssignee}
+                    className="p-2 bg-zinc-900 text-white rounded-xl hover:bg-zinc-800 transition-colors"
+                  >
+                    <Plus size={20} />
+                  </button>
+                </div>
+
+                <div className="flex flex-wrap gap-2 mt-3">
+                  {asignadoA.map((name) => (
+                    <span
+                      key={name}
+                      className="flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-700 rounded-lg text-sm font-medium border border-blue-200 group"
+                    >
+                      <User size={12} className="text-blue-400" />
+                      {name}
+                      <button
+                        type="button"
+                        onClick={() => removeAssignee(name)}
+                        className="ml-1 text-blue-400 hover:text-red-500 transition-colors"
+                      >
+                        <X size={14} />
+                      </button>
+                    </span>
+                  ))}
+                </div>
               </div>
 
               <div className="space-y-2">

@@ -261,7 +261,7 @@ export const ProjectDetail: React.FC = () => {
     setIsTaskModalOpen(true);
   };
 
-  const handleSaveTask = async (data: { titulo: string; descripcion: string; tags: string[]; fechaInicio?: string; fechaFin?: string; tipo?: "PoC" | "Presentation" | "Run" | "Build" | "" }) => {
+  const handleSaveTask = async (data: { titulo: string; descripcion: string; tags: string[]; asignadoA: string[]; fechaInicio?: string; fechaFin?: string; tipo?: "PoC" | "Presentation" | "Run" | "Build" | "" }) => {
     if (!id) return;
 
     if (taskToEdit) {
@@ -484,6 +484,7 @@ export const ProjectDetail: React.FC = () => {
           titulo: taskToEdit.titulo,
           descripcion: taskToEdit.descripcion || "",
           tags: taskToEdit.tags || [],
+          asignadoA: taskToEdit.asignadoA || [],
           fechaInicio: taskToEdit.fechaInicio,
           fechaFin: taskToEdit.fechaFin,
           tipo: taskToEdit.tipo,
