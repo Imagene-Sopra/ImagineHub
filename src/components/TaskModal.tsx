@@ -25,7 +25,6 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSave, o
   const [description, setDescription] = useState(initialData?.descripcion || "");
   const [tagInput, setTagInput] = useState("");
   const [tags, setTags] = useState<string[]>(initialData?.tags || []);
-  const [assigneeInput, setAssigneeInput] = useState("");
   const [asignadoA, setAsignadoA] = useState<string[]>(initialData?.asignadoA || []);
   const [startDate, setStartDate] = useState(initialData?.fechaInicio || "");
   const [endDate, setEndDate] = useState(initialData?.fechaFin || "");
@@ -56,10 +55,9 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSave, o
     setTags(tags.filter(t => t !== tagToRemove));
   };
 
-  const handleAddAssignee = () => {
-    if (assigneeInput.trim() && !asignadoA.includes(assigneeInput.trim())) {
-      setAsignadoA([...asignadoA, assigneeInput.trim()]);
-      setAssigneeInput("");
+  const handleAddAssignee = (name: string) => {
+    if (name && !asignadoA.includes(name)) {
+      setAsignadoA([...asignadoA, name]);
     }
   };
 
@@ -213,23 +211,18 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSave, o
 
               <div className="space-y-2">
                 <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">{TASK_FIELDS.assignedTo}</label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={assigneeInput}
-                    onChange={(e) => setAssigneeInput(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddAssignee())}
-                    placeholder={TASK_FIELDS.assignedToPlaceholder}
-                    className="flex-1 px-4 py-2 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:border-zinc-900 transition-all"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleAddAssignee}
-                    className="p-2 bg-zinc-900 text-white rounded-xl hover:bg-zinc-800 transition-colors"
-                  >
-                    <Plus size={20} />
-                  </button>
-                </div>
+                <select
+                  value=""
+                  onChange={(e) => handleAddAssignee(e.target.value)}
+                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:border-zinc-900 transition-all cursor-pointer font-medium"
+                >
+                  <option value="">{TASK_FIELDS.assignedToPlaceholder}</option>
+                  {TASK_FIELDS.assignees
+                    .filter((name) => !asignadoA.includes(name))
+                    .map((name) => (
+                      <option key={name} value={name}>{name}</option>
+                    ))}
+                </select>
 
                 <div className="flex flex-wrap gap-2 mt-3">
                   {asignadoA.map((name) => (

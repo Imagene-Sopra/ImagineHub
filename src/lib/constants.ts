@@ -21,5 +21,6 @@ export const CONFIRM_DELETE_PROJECT = {
 
 export const TASK_FIELDS = {
   assignedTo: "Asignado a",
-  assignedToPlaceholder: "Añadir persona...",
+  assignedToPlaceholder: "Seleccionar persona...",
+  assignees: ["Aarón", "Yanran", "Guillermo", "Carlos", "Daviz"],
 };
