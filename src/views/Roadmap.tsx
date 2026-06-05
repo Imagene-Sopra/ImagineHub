@@ -482,7 +482,7 @@ export const Roadmap: React.FC = () => {
                                   Punt. {task.score}
                                 </span>
                               </div>
-                              {task.tags?.slice(0, 2).map((tag, i) => (
+                              {task.tags?.map((tag, i) => (
                                 <span key={i} className="text-[9px] bg-zinc-100 px-1 rounded text-zinc-500 border border-zinc-200/40">
                                   {tag}
                                 </span>
