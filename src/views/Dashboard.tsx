@@ -348,10 +348,10 @@ export const Dashboard: React.FC = () => {
                   <thead>
                     <tr className="border-b border-zinc-100 text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
                       <th className="px-6 py-2">Tarea</th>
-                      <th className="px-3 py-2">Asignado</th>
                       <th className="px-3 py-2 text-center">Estado</th>
                       <th className="px-3 py-2 text-center">Crit.</th>
                       <th className="px-6 py-2 text-right">Punt.</th>
+                      <th className="px-3 py-2">Asignado</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-50">
@@ -377,28 +377,6 @@ export const Dashboard: React.FC = () => {
                               )}
                             </div>
                           </div>
-                        </td>
-                        <td className="px-3 py-3">
-                          {task.asignadoA && task.asignadoA.length > 0 ? (
-                            <div className="flex items-center -space-x-1.5">
-                              {task.asignadoA.slice(0, 3).map((name: string) => (
-                                <span
-                                  key={name}
-                                  title={name}
-                                  className="w-6 h-6 rounded-full bg-blue-100 border-2 border-white text-blue-700 text-[9px] font-black flex items-center justify-center shrink-0 shadow-sm"
-                                >
-                                  {name.slice(0, 2).toUpperCase()}
-                                </span>
-                              ))}
-                              {task.asignadoA.length > 3 && (
-                                <span className="w-6 h-6 rounded-full bg-zinc-100 border-2 border-white text-zinc-500 text-[9px] font-bold flex items-center justify-center shrink-0 shadow-sm">
-                                  +{task.asignadoA.length - 3}
-                                </span>
-                              )}
-                            </div>
-                          ) : (
-                            <span className="text-zinc-300 text-[10px]">—</span>
-                          )}
                         </td>
                         <td className="px-3 py-3 text-center">
                           <span className={cn(
@@ -431,6 +409,28 @@ export const Dashboard: React.FC = () => {
                               {task.score}
                             </span>
                           </div>
+                        </td>
+                        <td className="px-3 py-3">
+                          {task.asignadoA && task.asignadoA.length > 0 ? (
+                            <div className="flex items-center -space-x-1.5">
+                              {task.asignadoA.slice(0, 3).map((name: string) => (
+                                <span
+                                  key={name}
+                                  title={name}
+                                  className="w-6 h-6 rounded-full bg-blue-100 border-2 border-white text-blue-700 text-[9px] font-black flex items-center justify-center shrink-0 shadow-sm"
+                                >
+                                  {name.slice(0, 2).toUpperCase()}
+                                </span>
+                              ))}
+                              {task.asignadoA.length > 3 && (
+                                <span className="w-6 h-6 rounded-full bg-zinc-100 border-2 border-white text-zinc-500 text-[9px] font-bold flex items-center justify-center shrink-0 shadow-sm">
+                                  +{task.asignadoA.length - 3}
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-zinc-300 text-[10px]">—</span>
+                          )}
                         </td>
                       </tr>
                     ))}
