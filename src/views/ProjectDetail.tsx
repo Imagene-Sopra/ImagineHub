@@ -6,6 +6,7 @@ import { Project, Task } from "../types";
 import { Plus, Sparkles, ChevronLeft, Trash2, Loader2, Pencil, Lock, Unlock, User, GripVertical } from "lucide-react";
 import { geminiService } from "../services/geminiService";
 import { cn } from "../lib/utils";
+import { CONFIRM_DELETE_TASK } from "../lib/constants";
 import { TaskModal } from "../components/TaskModal";
 import {
   DndContext,
@@ -79,19 +80,19 @@ const SortableTaskCard = ({ task, status, onMove, onDelete, onGenerate, onEditTa
       </div>
       {confirmDelete && (
         <div className="absolute inset-0 z-10 bg-white/95 rounded-xl flex flex-col items-center justify-center gap-3 p-4">
-          <p className="text-sm font-bold text-zinc-800">¿Eliminar esta tarea?</p>
+          <p className="text-sm font-bold text-zinc-800">{CONFIRM_DELETE_TASK.message}</p>
           <div className="flex gap-2">
             <button
               onClick={() => setConfirmDelete(false)}
               className="px-3 py-1.5 text-xs font-bold border border-zinc-300 rounded-lg text-zinc-600 hover:bg-zinc-100 transition-colors"
             >
-              Cancelar
+              {CONFIRM_DELETE_TASK.cancel}
             </button>
             <button
               onClick={() => onDelete(task.id)}
               className="px-3 py-1.5 text-xs font-bold bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
             >
-              Aceptar
+              {CONFIRM_DELETE_TASK.accept}
             </button>
           </div>
         </div>

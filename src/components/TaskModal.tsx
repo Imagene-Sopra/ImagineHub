@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { X, Plus, Tag as TagIcon, Trash2 } from "lucide-react";
+import { CONFIRM_DELETE_TASK } from "../lib/constants";
 
 interface TaskModalProps {
   isOpen: boolean;
@@ -106,22 +107,22 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSave, o
             <form onSubmit={handleSubmit} className="p-6 space-y-5 max-h-[70vh] overflow-y-auto">
               {showDeleteConfirm && (
                 <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex flex-col gap-3">
-                  <p className="text-sm font-bold text-red-700">¿Eliminar esta tarea?</p>
-                  <p className="text-xs text-red-500">Esta acción no se puede deshacer.</p>
+                  <p className="text-sm font-bold text-red-700">{CONFIRM_DELETE_TASK.message}</p>
+                  <p className="text-xs text-red-500">{CONFIRM_DELETE_TASK.warning}</p>
                   <div className="flex gap-2 justify-end">
                     <button
                       type="button"
                       onClick={() => setShowDeleteConfirm(false)}
                       className="px-4 py-2 text-xs font-bold border border-zinc-300 rounded-lg text-zinc-600 hover:bg-zinc-100 transition-colors"
                     >
-                      Cancelar
+                      {CONFIRM_DELETE_TASK.cancel}
                     </button>
                     <button
                       type="button"
                       onClick={() => { onDelete!(); onClose(); }}
                       className="px-4 py-2 text-xs font-bold bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
                     >
-                      Aceptar
+                      {CONFIRM_DELETE_TASK.accept}
                     </button>
                   </div>
                 </div>
