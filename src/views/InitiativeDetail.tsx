@@ -112,6 +112,17 @@ const SortableTaskCard = ({ task, status, onMove, onDelete, onGenerate, onEditTa
           </span>
         </div>
       )}
+
+      {task.asignadoA && task.asignadoA.length > 0 && (
+        <div className="flex flex-wrap gap-1 mb-4 ml-6">
+          {task.asignadoA.map((name: string) => (
+            <span key={name} className="flex items-center gap-1 px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded text-[10px] font-medium border border-blue-200">
+              <User size={10} />
+              {name}
+            </span>
+          ))}
+        </div>
+      )}
       
       {(task.fechaInicio || task.fechaFin) && (
         <div className="flex items-center gap-3 mb-4 ml-6 text-[10px] text-zinc-500 font-medium">
@@ -261,7 +272,7 @@ export const InitiativeDetail: React.FC = () => {
     setIsTaskModalOpen(true);
   };
 
-  const handleSaveTask = async (data: { titulo: string; descripcion: string; tags: string[]; fechaInicio?: string; fechaFin?: string; tipo?: "PoC" | "Presentation" | "Run" | "Build" | "" }) => {
+  const handleSaveTask = async (data: { titulo: string; descripcion: string; tags: string[]; asignadoA: string[]; fechaInicio?: string; fechaFin?: string; tipo?: "PoC" | "Presentation" | "Run" | "Build" | "" }) => {
     if (!id) return;
 
     if (taskToEdit) {
@@ -484,6 +495,7 @@ export const InitiativeDetail: React.FC = () => {
           titulo: taskToEdit.titulo,
           descripcion: taskToEdit.descripcion || "",
           tags: taskToEdit.tags || [],
+          asignadoA: taskToEdit.asignadoA || [],
           fechaInicio: taskToEdit.fechaInicio,
           fechaFin: taskToEdit.fechaFin,
           tipo: taskToEdit.tipo,
