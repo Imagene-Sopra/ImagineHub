@@ -11,6 +11,7 @@ import {
   Map
 } from "lucide-react";
 import { cn } from "../lib/utils";
+import { SECTION_LABELS } from "../lib/constants";
 
 const SidebarItem = ({ to, icon: Icon, label, active }: { to: string, icon: any, label: string, active: boolean }) => (
   <Link
@@ -31,13 +32,13 @@ export const Layout: React.FC = () => {
   const location = useLocation();
 
   const menuItems = [
-    { to: "/", icon: Home, label: "Home" },
-    { to: "/roadmap", icon: Map, label: "Roadmap" },
-    { to: "/initiatives", icon: Rocket, label: "Iniciativas" },
-    { to: "/projects", icon: Briefcase, label: "Proyectos" },
-    { to: "/mailbox", icon: Mail, label: "Buzón" },
-    { to: "/calendar", icon: Calendar, label: "Calendario" },
-    { to: "/imagine", icon: ImageIcon, label: "Imagene V1" },
+    { to: "/", icon: Home, label: SECTION_LABELS.home },
+    { to: "/roadmap", icon: Map, label: SECTION_LABELS.roadmap },
+    { to: "/initiatives", icon: Rocket, label: SECTION_LABELS.initiatives },
+    { to: "/projects", icon: Briefcase, label: SECTION_LABELS.projects },
+    { to: "/mailbox", icon: Mail, label: SECTION_LABELS.mailbox },
+    { to: "/calendar", icon: Calendar, label: SECTION_LABELS.calendar },
+    { to: "/imagine", icon: ImageIcon, label: SECTION_LABELS.imagine },
   ];
 
   return (

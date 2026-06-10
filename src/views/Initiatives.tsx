@@ -6,7 +6,7 @@ import { Rocket, Plus, Search, Calendar, Trash2, Pencil, User, X, CheckCircle2, 
 import { Link } from "react-router-dom";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { CONFIRM_DELETE_INITIATIVE } from "../lib/constants";
+import { CONFIRM_DELETE_INITIATIVE, SECTION_LABELS } from "../lib/constants";
 import {
   DndContext,
   closestCenter,
@@ -267,7 +267,7 @@ export const Initiatives: React.FC = () => {
     <div className="max-w-6xl mx-auto">
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">Iniciativas</h2>
+          <h2 className="text-2xl font-bold tracking-tight">{SECTION_LABELS.initiatives}</h2>
           <p className="text-zinc-500">Proyectos estratégicos de la compañía.</p>
         </div>
         <button 
