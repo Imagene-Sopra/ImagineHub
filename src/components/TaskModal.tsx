@@ -6,7 +6,7 @@ import { CONFIRM_DELETE_TASK, TASK_FIELDS } from "../lib/constants";
 interface TaskModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (data: { titulo: string; descripcion: string; tags: string[]; asignadoA: string[]; fechaInicio?: string; fechaFin?: string; tipo?: "PoC" | "Presentation" | "Run" | "Build" | "" }) => void;
+  onSave: (data: { titulo: string; descripcion: string; tags: string[]; asignadoA: string[]; fechaInicio?: string; fechaFin?: string; estimacion?: number; tipo?: "PoC" | "Presentation" | "Run" | "Build" | "" }) => void;
   onDelete?: () => void;
   contextType: "initiative" | "project";
   initialData?: {
@@ -16,6 +16,7 @@ interface TaskModalProps {
     asignadoA?: string[];
     fechaInicio?: string;
     fechaFin?: string;
+    estimacion?: number;
     tipo?: string;
   };
 }
@@ -28,6 +29,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSave, o
   const [asignadoA, setAsignadoA] = useState<string[]>(initialData?.asignadoA || []);
   const [startDate, setStartDate] = useState(initialData?.fechaInicio || "");
   const [endDate, setEndDate] = useState(initialData?.fechaFin || "");
+  const [estimacion, setEstimacion] = useState(initialData?.estimacion != null ? String(initialData.estimacion) : "");
   const [tipo, setTipo] = useState<"PoC" | "Presentation" | "Run" | "Build" | "">(initialData?.tipo as any || "");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
@@ -39,10 +41,23 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSave, o
       setAsignadoA(initialData?.asignadoA || []);
       setStartDate(initialData?.fechaInicio || "");
       setEndDate(initialData?.fechaFin || "");
+      setEstimacion(initialData?.estimacion != null ? String(initialData.estimacion) : "");
       setTipo(initialData?.tipo as any || "");
       setShowDeleteConfirm(false);
     }
   }, [isOpen, initialData]);
+
+  const calcularFechaInicio = (fin: string, estim: string) => {
+    if (!startDate && fin && estim) {
+      const estimVal = parseFloat(estim.replace(",", "."));
+      if (!isNaN(estimVal) && estimVal > 0) {
+        const jornadas = Math.ceil(estimVal / 8);
+        const endDate_ = new Date(fin);
+        endDate_.setDate(endDate_.getDate() - jornadas);
+        setStartDate(endDate_.toISOString().split("T")[0]);
+      }
+    }
+  };
 
   const handleAddTag = () => {
     if (tagInput.trim() && !tags.includes(tagInput.trim())) {
@@ -75,6 +90,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSave, o
         asignadoA,
         fechaInicio: startDate,
         fechaFin: endDate,
+        estimacion: estimacion !== "" ? parseFloat(estimacion.replace(",", ".")) : undefined,
         tipo
       });
       setTitle("");
@@ -83,6 +99,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSave, o
       setAsignadoA([]);
       setStartDate("");
       setEndDate("");
+      setEstimacion("");
       setTipo("");
       onClose();
     }
@@ -181,10 +198,23 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSave, o
                   <input
                     type="date"
                     value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
+                    onChange={(e) => { setEndDate(e.target.value); calcularFechaInicio(e.target.value, estimacion); }}
                     className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:border-zinc-900 transition-all"
                   />
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">Estimación (horas)</label>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={estimacion}
+                  onChange={(e) => setEstimacion(e.target.value)}
+                  onBlur={() => calcularFechaInicio(endDate, estimacion)}
+                  placeholder="Ej: 1.5 = 1h 30min"
+                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:border-zinc-900 transition-all"
+                />
               </div>
 
               <div className="space-y-2">

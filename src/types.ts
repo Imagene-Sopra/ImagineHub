@@ -43,6 +43,7 @@ export interface Task {
   orden?: number;
   fechaInicio?: string;
   fechaFin?: string;
+  estimacion?: number;
   tipo?: "PoC" | "Presentation" | "Run" | "Build" | "";
 }
 
