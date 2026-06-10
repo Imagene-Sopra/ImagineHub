@@ -7,6 +7,7 @@ import { format, addMonths, startOfMonth, endOfMonth, eachMonthOfInterval, isWit
 import { es } from "date-fns/locale";
 import { cn } from "../lib/utils";
 import { TaskModal } from "../components/TaskModal";
+import { SECTION_NAMES } from "../lib/constants";
 
 export const Roadmap: React.FC = () => {
   const MONTH_COLUMN_WIDTH = 176;
@@ -320,7 +321,7 @@ export const Roadmap: React.FC = () => {
               </summary>
               <div className="absolute right-0 top-full mt-2 w-72 max-h-64 overflow-auto rounded-xl border border-zinc-200 bg-white shadow-xl z-20 p-2">
                 <div className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider text-zinc-400">
-                  Proyectos e iniciativas
+                  {SECTION_NAMES.squad} y {SECTION_NAMES.lab}
                 </div>
                 {roadmapFilterOptions.length === 0 ? (
                   <div className="px-2 py-2 text-xs text-zinc-500">No hay elementos para filtrar.</div>
@@ -337,7 +338,7 @@ export const Roadmap: React.FC = () => {
                         className="rounded border-zinc-300 text-zinc-900 focus:ring-zinc-400"
                       />
                       <span className="text-xs text-zinc-700 truncate">{option.label}</span>
-                      <span className="text-[9px] text-zinc-400 uppercase ml-auto">{option.type === "project" ? "Proyecto" : "Iniciativa"}</span>
+                      <span className="text-[9px] text-zinc-400 uppercase ml-auto">{option.type === "project" ? "SQUAD" : "LAB"}</span>
                     </label>
                   ))
                 )}

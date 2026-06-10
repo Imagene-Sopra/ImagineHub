@@ -427,11 +427,11 @@ export const ProjectDetail: React.FC = () => {
             >
               {project?.estado === "closed" ? (
                 <>
-                  <Unlock size={16} /> Reabrir Proyecto
+                  <Unlock size={16} /> Reabrir SQUAD
                 </>
               ) : (
                 <>
-                  <Lock size={16} /> Cerrar Proyecto
+                  <Lock size={16} /> Cerrar SQUAD
                 </>
               )}
             </button>

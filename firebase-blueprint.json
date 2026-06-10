@@ -115,7 +115,7 @@
       "properties": {
         "titulo": { "type": "string" },
         "descripcion": { "type": "string" },
-        "tipo": { "type": "string", "enum": ["iniciativa", "tarea", "sesion", "foro", "proyecto"] },
+        "tipo": { "type": "string", "enum": ["lab", "tarea", "sesion", "foro", "squad"] },
         "referenciaId": { "type": "string" },
         "usuarioId": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" }

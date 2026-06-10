@@ -87,7 +87,7 @@ export interface News {
   id: string;
   titulo: string;
   descripcion: string;
-  tipo: "iniciativa" | "tarea" | "sesion" | "foro" | "proyecto";
+  tipo: "lab" | "tarea" | "sesion" | "foro" | "squad";
   referenciaId: string;
   usuarioId: string;
   createdAt: string;

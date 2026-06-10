@@ -10,13 +10,18 @@ export const CONFIRM_DELETE_TASK = {
 };
 
 export const CONFIRM_DELETE_INITIATIVE = {
-  message: "¿Eliminar iniciativa?",
+  message: "¿Eliminar LAB?",
   ...CONFIRM_DELETE,
 };
 
 export const CONFIRM_DELETE_PROJECT = {
-  message: "¿Eliminar proyecto?",
+  message: "¿Eliminar SQUAD?",
   ...CONFIRM_DELETE,
+};
+
+export const SECTION_NAMES = {
+  lab: "LAB",
+  squad: "SQUAD",
 };
 
 export const TASK_FIELDS = {

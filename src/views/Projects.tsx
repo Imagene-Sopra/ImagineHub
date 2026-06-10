@@ -6,7 +6,7 @@ import { Briefcase, Plus, Search, Calendar, Trash2, Pencil, User, X, Clock, Rock
 import { Link } from "react-router-dom";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { CONFIRM_DELETE_PROJECT } from "../lib/constants";
+import { CONFIRM_DELETE_PROJECT, SECTION_NAMES } from "../lib/constants";
 import {
   DndContext,
   closestCenter,
@@ -233,9 +233,9 @@ export const Projects: React.FC = () => {
 
       // Create news
       await addDoc(collection(db, "news"), {
-        titulo: `Nuevo proyecto: ${newProject.nombre}`,
-        descripcion: `Se ha iniciado un nuevo proyecto estratégico.`,
-        tipo: "proyecto",
+        titulo: `Nuevo SQUAD: ${newProject.nombre}`,
+        descripcion: `Se ha iniciado un nuevo SQUAD estratégico.`,
+        tipo: "squad",
         referenciaId: docRef.id,
         usuarioId: "guest",
         createdAt: new Date().toISOString(),
@@ -266,7 +266,7 @@ export const Projects: React.FC = () => {
     <div className="max-w-6xl mx-auto">
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">Proyectos</h2>
+          <h2 className="text-2xl font-bold tracking-tight">{SECTION_NAMES.squad}</h2>
           <p className="text-zinc-500">Gestión de proyectos y entregables.</p>
         </div>
         <button 
@@ -278,7 +278,7 @@ export const Projects: React.FC = () => {
           className="flex items-center gap-2 bg-zinc-900 text-white px-4 py-2 rounded-lg hover:bg-zinc-800 transition-colors"
         >
           <Plus size={20} />
-          <span>Nuevo Proyecto</span>
+          <span>Nuevo SQUAD</span>
         </button>
       </div>
 
@@ -311,7 +311,7 @@ export const Projects: React.FC = () => {
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl w-full max-w-md p-8 shadow-2xl">
             <div className="flex justify-between items-center mb-6">
-              <h3 className="text-xl font-bold">{editingProject ? "Editar Proyecto" : "Crear Proyecto"}</h3>
+              <h3 className="text-xl font-bold">{editingProject ? "Editar SQUAD" : "Crear SQUAD"}</h3>
               <button onClick={() => setShowModal(false)} className="text-zinc-400 hover:text-zinc-900">
                 <X size={20} />
               </button>

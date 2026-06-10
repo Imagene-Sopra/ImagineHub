@@ -392,7 +392,7 @@ export const InitiativeDetail: React.FC = () => {
           onClick={() => navigate("/initiatives")}
           className="flex items-center gap-1 text-zinc-500 hover:text-zinc-900 mb-4 text-sm font-medium"
         >
-          <ChevronLeft size={16} /> Volver a iniciativas
+          <ChevronLeft size={16} /> Volver a LABs
         </button>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -427,11 +427,11 @@ export const InitiativeDetail: React.FC = () => {
             >
               {initiative?.estado === "closed" ? (
                 <>
-                  <Unlock size={16} /> Reabrir Iniciativa
+                  <Unlock size={16} /> Reabrir LAB
                 </>
               ) : (
                 <>
-                  <Lock size={16} /> Cerrar Iniciativa
+                  <Lock size={16} /> Cerrar LAB
                 </>
               )}
             </button>

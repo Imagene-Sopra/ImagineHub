@@ -11,6 +11,7 @@ import {
   Map
 } from "lucide-react";
 import { cn } from "../lib/utils";
+import { SECTION_NAMES } from "../lib/constants";
 
 const SidebarItem = ({ to, icon: Icon, label, active }: { to: string, icon: any, label: string, active: boolean }) => (
   <Link
@@ -33,8 +34,8 @@ export const Layout: React.FC = () => {
   const menuItems = [
     { to: "/", icon: Home, label: "Home" },
     { to: "/roadmap", icon: Map, label: "Roadmap" },
-    { to: "/initiatives", icon: Rocket, label: "Iniciativas" },
-    { to: "/projects", icon: Briefcase, label: "Proyectos" },
+    { to: "/initiatives", icon: Rocket, label: SECTION_NAMES.lab },
+    { to: "/projects", icon: Briefcase, label: SECTION_NAMES.squad },
     { to: "/mailbox", icon: Mail, label: "Buzón" },
     { to: "/calendar", icon: Calendar, label: "Calendario" },
     { to: "/imagine", icon: ImageIcon, label: "Imagene V1" },
