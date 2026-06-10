@@ -20,8 +20,8 @@ export const CONFIRM_DELETE_PROJECT = {
 };
 
 export const SECTION_NAMES = {
-  lab: "LAB",
-  squad: "SQUAD",
+  initiative: "LAB",
+  project: "SQUAD",
 };
 
 export const TASK_FIELDS = {

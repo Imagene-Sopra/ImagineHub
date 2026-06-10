@@ -234,8 +234,8 @@ export const Initiatives: React.FC = () => {
 
       // Create news
       await addDoc(collection(db, "news"), {
-        titulo: `Nuevo LAB: ${newInit.nombre}`,
-        descripcion: `Se ha lanzado un nuevo LAB transversal.`,
+        titulo: `Nuevo ${SECTION_NAMES.initiative}: ${newInit.nombre}`,
+        descripcion: `Se ha lanzado un nuevo ${SECTION_NAMES.initiative} transversal.`,
         tipo: "lab",
         referenciaId: docRef.id,
         usuarioId: "guest",
@@ -267,7 +267,7 @@ export const Initiatives: React.FC = () => {
     <div className="max-w-6xl mx-auto">
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">{SECTION_NAMES.lab}</h2>
+          <h2 className="text-2xl font-bold tracking-tight">{SECTION_NAMES.initiative}</h2>
           <p className="text-zinc-500">Proyectos estratégicos de la compañía.</p>
         </div>
         <button 
@@ -279,7 +279,7 @@ export const Initiatives: React.FC = () => {
           className="flex items-center gap-2 bg-zinc-900 text-white px-4 py-2 rounded-lg hover:bg-zinc-800 transition-colors"
         >
           <Plus size={20} />
-          <span>Nuevo LAB</span>
+          <span>Nuevo {SECTION_NAMES.initiative}</span>
         </button>
       </div>
 
@@ -312,7 +312,7 @@ export const Initiatives: React.FC = () => {
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl w-full max-w-md p-8 shadow-2xl">
             <div className="flex justify-between items-center mb-6">
-              <h3 className="text-xl font-bold">{editingInit ? "Editar LAB" : "Crear LAB"}</h3>
+              <h3 className="text-xl font-bold">{editingInit ? `Editar ${SECTION_NAMES.initiative}` : `Crear ${SECTION_NAMES.initiative}`}</h3>
               <button onClick={() => setShowModal(false)} className="text-zinc-400 hover:text-zinc-900">
                 <X size={20} />
               </button>

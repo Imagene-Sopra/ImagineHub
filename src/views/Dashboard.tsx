@@ -236,7 +236,7 @@ export const Dashboard: React.FC = () => {
         <div className="md:col-span-7 space-y-8">
           <section>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold tracking-tight">Últimas {SECTION_NAMES.lab}</h2>
+              <h2 className="text-xl font-bold tracking-tight">Últimas {SECTION_NAMES.initiative}</h2>
               <Link to="/initiatives" className="text-sm text-zinc-500 hover:text-zinc-900 flex items-center gap-1">
                 Ver todas <ArrowRight size={14} />
               </Link>
@@ -305,11 +305,11 @@ export const Dashboard: React.FC = () => {
             <p className="text-zinc-400 text-sm mb-6">Resumen rápido de lo que está pasando hoy.</p>
             <div className="space-y-4">
               <div className="flex justify-between items-center">
-                <span className="text-sm text-zinc-400">{SECTION_NAMES.lab} activos</span>
+                <span className="text-sm text-zinc-400">{SECTION_NAMES.initiative} activos</span>
                 <span className="font-bold">{activeInitiativesCount}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-sm text-zinc-400">{SECTION_NAMES.squad} activos</span>
+                <span className="text-sm text-zinc-400">{SECTION_NAMES.project} activos</span>
                 <span className="font-bold">{activeProjectsCount}</span>
               </div>
               <div className="flex justify-between items-center">

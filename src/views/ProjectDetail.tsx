@@ -6,7 +6,7 @@ import { Project, Task } from "../types";
 import { Plus, Sparkles, ChevronLeft, Trash2, Loader2, Pencil, Lock, Unlock, User, GripVertical } from "lucide-react";
 import { geminiService } from "../services/geminiService";
 import { cn } from "../lib/utils";
-import { CONFIRM_DELETE_TASK } from "../lib/constants";
+import { CONFIRM_DELETE_TASK, SECTION_NAMES } from "../lib/constants";
 import { TaskModal } from "../components/TaskModal";
 import {
   DndContext,
@@ -427,11 +427,11 @@ export const ProjectDetail: React.FC = () => {
             >
               {project?.estado === "closed" ? (
                 <>
-                  <Unlock size={16} /> Reabrir SQUAD
+                  <Unlock size={16} /> Reabrir {SECTION_NAMES.project}
                 </>
               ) : (
                 <>
-                  <Lock size={16} /> Cerrar SQUAD
+                  <Lock size={16} /> Cerrar {SECTION_NAMES.project}
                 </>
               )}
             </button>
