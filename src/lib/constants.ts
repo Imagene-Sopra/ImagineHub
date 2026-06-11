@@ -1,3 +1,13 @@
+export const SECTION_LABELS = {
+  home: "Home",
+  roadmap: "Roadmap",
+  initiatives: "Lab",
+  projects: "Squad",
+  mailbox: "Buzón",
+  calendar: "Calendario",
+  imagine: "Imagene V1",
+};
+
 export const CONFIRM_DELETE = {
   warning: "Esta acción no se puede deshacer.",
   cancel: "Cancelar",

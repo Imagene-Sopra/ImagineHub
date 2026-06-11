@@ -6,7 +6,7 @@ import { Briefcase, Plus, Search, Calendar, Trash2, Pencil, User, X, Clock, Rock
 import { Link } from "react-router-dom";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { CONFIRM_DELETE_PROJECT } from "../lib/constants";
+import { CONFIRM_DELETE_PROJECT, SECTION_LABELS } from "../lib/constants";
 import {
   DndContext,
   closestCenter,
@@ -266,7 +266,7 @@ export const Projects: React.FC = () => {
     <div className="max-w-6xl mx-auto">
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">Proyectos</h2>
+          <h2 className="text-2xl font-bold tracking-tight">{SECTION_LABELS.projects}</h2>
           <p className="text-zinc-500">Gestión de proyectos y entregables.</p>
         </div>
         <button 
