@@ -1,8 +1,8 @@
 export const SECTION_LABELS = {
   home: "Home",
   roadmap: "Roadmap",
-  initiatives: "Lab",
-  projects: "Squad",
+  initiatives: "Iniciativas",
+  projects: "Proyectos",
   mailbox: "Buzón",
   calendar: "Calendario",
   imagine: "Imagene V1",
