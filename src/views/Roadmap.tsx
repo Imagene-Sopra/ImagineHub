@@ -263,7 +263,7 @@ export const Roadmap: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  const handleSaveTask = async (data: { titulo: string; descripcion: string; tags: string[]; fechaInicio?: string; fechaFin?: string; tipo?: "PoC" | "Presentation" | "Run" | "Build" | "" }) => {
+  const handleSaveTask = async (data: { titulo: string; descripcion: string; tags: string[]; asignadoA: string[]; fechaInicio?: string; fechaFin?: string; tipo?: "PoC" | "Presentation" | "Run" | "Build" | "" }) => {
     if (!selectedTask) return;
     const taskPath = selectedTask.iniciativaId
       ? doc(db, "initiatives", selectedTask.iniciativaId, "tasks", selectedTask.id)
@@ -487,6 +487,11 @@ export const Roadmap: React.FC = () => {
                                   {tag}
                                 </span>
                               ))}
+                              {task.asignadoA?.map((name, i) => (
+                                <span key={i} className="text-[9px] bg-blue-50 px-1 rounded text-blue-600 border border-blue-200/60">
+                                  {name}
+                                </span>
+                              ))}
                             </div>
                           </div>
 
@@ -529,6 +534,7 @@ export const Roadmap: React.FC = () => {
             titulo: selectedTask.titulo,
             descripcion: selectedTask.descripcion || "",
             tags: selectedTask.tags || [],
+            asignadoA: selectedTask.asignadoA || [],
             fechaInicio: selectedTask.fechaInicio,
             fechaFin: selectedTask.fechaFin,
             tipo: selectedTask.tipo,
