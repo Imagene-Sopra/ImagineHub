@@ -45,10 +45,13 @@ export const Layout: React.FC = () => {
     <div className="flex h-screen bg-white text-zinc-900 font-sans">
       {/* Sidebar */}
       <aside className="w-64 border-r border-zinc-100 flex flex-col p-4 bg-zinc-50/50">
-        <div className="flex items-center gap-2 px-4 mb-8">
-          <div className="bg-zinc-900 text-white px-3 py-1 rounded-xl font-normal text-xl tracking-tight">
-            Imagene <span className="font-bold">Hub</span>
-          </div>
+        <div className="flex items-center justify-center px-4 mb-8">
+          <img
+            src="logo.png"
+            alt="Imagine Hub"
+            className="h-[calc(var(--spacing)*22)] w-auto object-contain"
+            referrerPolicy="no-referrer"
+          />
         </div>
 
         <nav className="flex-1 flex flex-col gap-1">

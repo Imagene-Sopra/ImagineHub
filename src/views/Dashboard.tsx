@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { collection, query, orderBy, limit, onSnapshot, collectionGroup, where } from "firebase/firestore";
 import { db } from "../firebase";
 import { News, Initiative, Task, Session } from "../types";
@@ -29,6 +29,39 @@ export const Dashboard: React.FC = () => {
   const [pendingTasks, setPendingTasks] = useState<Task[]>([]);
   const [projectsMap, setProjectsMap] = useState<Record<string, string>>({});
   const [initiativesMap, setInitiativesMap] = useState<Record<string, string>>({});
+
+  const workloadByAssignee = useMemo(() => {
+    const summary: Record<string, { total: number; byType: Record<string, number> }> = {};
+
+    pendingTasks.forEach((task) => {
+      if (task.estado !== "todo" && task.estado !== "in_progress") return;
+      if (!task.asignadoA || task.asignadoA.length === 0) return;
+
+      const taskType = task.tipo || "Sin tipo";
+
+      task.asignadoA.forEach((name) => {
+        if (!summary[name]) {
+          summary[name] = {
+            total: 0,
+            byType: {
+              Run: 0,
+              Build: 0,
+              Presentation: 0,
+              PoC: 0,
+              "Sin tipo": 0,
+            },
+          };
+        }
+
+        summary[name].total += 1;
+        summary[name].byType[taskType] = (summary[name].byType[taskType] || 0) + 1;
+      });
+    });
+
+    return Object.entries(summary)
+      .map(([name, data]) => ({ name, ...data }))
+      .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name, "es", { sensitivity: "base" }));
+  }, [pendingTasks]);
 
   useEffect(() => {
     const qNews = query(collection(db, "news"), orderBy("createdAt", "desc"), limit(10));
@@ -322,9 +355,12 @@ export const Dashboard: React.FC = () => {
             </div>
           </div>
 
-          <div className="p-6 border border-zinc-100 rounded-2xl bg-white shadow-sm overflow-hidden">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-bold text-zinc-900 text-base">Tareas pendientes</h3>
+          <div className="p-6 border border-zinc-100 rounded-2xl bg-white shadow-sm">
+            <div className="flex items-center justify-between gap-3 mb-4">
+              <div>
+                <h3 className="font-bold text-zinc-900 text-base">Carga de trabajo</h3>
+                <p className="text-xs text-zinc-500">Solo tareas por iniciar y en curso.</p>
+              </div>
               <div className="flex items-center gap-2">
                 <Link
                   to="/roadmap"
@@ -332,110 +368,40 @@ export const Dashboard: React.FC = () => {
                 >
                   Ver roadmap
                 </Link>
-                <span className="text-[10px] bg-zinc-100 px-2.5 py-0.5 rounded-full text-zinc-500 font-bold">
-                  {filteredTasks.length}
-                </span>
               </div>
             </div>
-            
-            {filteredTasks.length === 0 ? (
+
+            {workloadByAssignee.length === 0 ? (
               <div className="text-center py-6 text-xs text-zinc-400">
-                No hay tareas pendientes.
+                No hay tareas asignadas pendientes.
               </div>
             ) : (
-              <div className="overflow-x-auto -mx-6">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="border-b border-zinc-100 text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
-                      <th className="px-6 py-2">Tarea</th>
-                      <th className="px-3 py-2 text-center">Estado</th>
-                      <th className="px-3 py-2 text-center">Crit.</th>
-                      <th className="px-6 py-2 text-right">Punt.</th>
-                      <th className="px-3 py-2">Asignado</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-zinc-50">
-                    {filteredTasks.map((task) => (
-                      <tr key={task.id} className="hover:bg-zinc-50/50 transition-colors">
-                        <td className="px-6 py-3">
-                          <div className="flex items-center gap-2">
-                            <span 
-                              className={cn(
-                                "w-2.5 h-2.5 rounded-full shrink-0 shadow-sm",
-                                task.dotColorClass
-                              )}
-                              title={(task.tipo as string) === 'Presentation' || (task.tipo as string) === 'Presentación' ? 'Presentación' : task.tipo}
-                            />
-                            <div className="min-w-0 max-w-[120px] sm:max-w-[140px] md:max-w-[110px] lg:max-w-[130px]">
-                              <p className="text-xs font-semibold text-zinc-800 truncate" title={task.fullTitle}>
-                                {task.fullTitle}
-                              </p>
-                              {task.daysDiffMessage && (
-                                <p className="text-[9px] text-zinc-400 font-medium truncate">
-                                  {task.daysDiffMessage}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-3 py-3 text-center">
-                          <span className={cn(
-                            "text-[10px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap",
-                            getTaskStatusMeta(task.estado).className
-                          )}>
-                            {getTaskStatusMeta(task.estado).label}
-                          </span>
-                        </td>
-                        <td className="px-3 py-3 text-center">
-                          <span className={cn(
-                            "text-[10px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider border shadow-xs",
-                            task.criticidad === "P1" && "bg-red-50 border-red-200 text-red-650",
-                            task.criticidad === "P2" && "bg-amber-100 border-amber-300 text-amber-800",
-                            task.criticidad === "P3" && "bg-purple-50 border-purple-200 text-purple-700",
-                            task.criticidad === "P4" && "bg-indigo-55 border-indigo-200 text-indigo-700"
-                          )}>
-                            {task.criticidad}
-                          </span>
-                        </td>
-                        <td className="px-6 py-3 text-right">
-                          <div className="inline-flex items-center justify-end gap-1 max-w-full">
-                            {getTaskScoreAlert(task.tipo, task.score) === "danger" && (
-                              <ShieldAlert size={11} className="shrink-0 text-red-600" />
-                            )}
-                            {getTaskScoreAlert(task.tipo, task.score) === "warning" && (
-                              <AlertTriangle size={11} className="shrink-0 text-orange-500" />
-                            )}
-                            <span className="text-xs font-bold font-mono text-zinc-900">
-                              {task.score}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="px-3 py-3">
-                          {task.asignadoA && task.asignadoA.length > 0 ? (
-                            <div className="flex items-center -space-x-1.5">
-                              {task.asignadoA.slice(0, 3).map((name: string) => (
-                                <span
-                                  key={name}
-                                  title={name}
-                                  className="w-6 h-6 rounded-full bg-blue-100 border-2 border-white text-blue-700 text-[9px] font-black flex items-center justify-center shrink-0 shadow-sm"
-                                >
-                                  {name.slice(0, 2).toUpperCase()}
-                                </span>
-                              ))}
-                              {task.asignadoA.length > 3 && (
-                                <span className="w-6 h-6 rounded-full bg-zinc-100 border-2 border-white text-zinc-500 text-[9px] font-bold flex items-center justify-center shrink-0 shadow-sm">
-                                  +{task.asignadoA.length - 3}
-                                </span>
-                              )}
-                            </div>
-                          ) : (
-                            <span className="text-zinc-300 text-[10px]">—</span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="space-y-3 max-h-80 overflow-auto pr-1">
+                {workloadByAssignee.map((person) => (
+                  <div key={person.name} className="p-3 rounded-xl border border-zinc-100 bg-zinc-50/60">
+                    <div className="flex items-center justify-between gap-3 mb-2">
+                      <span className="text-sm font-semibold text-zinc-900 truncate">{person.name}</span>
+                      <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-zinc-900 text-white">
+                        {person.total} tareas
+                      </span>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2 text-[10px] font-bold uppercase tracking-wider">
+                      <span className="px-2 py-1 rounded-full bg-red-50 border border-red-200 text-red-700">
+                        Run {person.byType.Run || 0}
+                      </span>
+                      <span className="px-2 py-1 rounded-full bg-amber-100 border border-amber-200 text-amber-800">
+                        Build {person.byType.Build || 0}
+                      </span>
+                      <span className="px-2 py-1 rounded-full bg-purple-50 border border-purple-200 text-purple-700">
+                        Presentación {person.byType.Presentation || 0}
+                      </span>
+                      <span className="px-2 py-1 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700">
+                        PoC {person.byType.PoC || 0}
+                      </span>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>
