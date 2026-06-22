@@ -6,9 +6,10 @@ import { CONFIRM_DELETE_TASK, TASK_FIELDS } from "../lib/constants";
 interface TaskModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (data: { titulo: string; descripcion: string; tags: string[]; asignadoA: string[]; fechaInicio?: string; fechaFin?: string; tipo?: "PoC" | "Presentation" | "Run" | "Build" | "" }) => void;
+  onSave: (data: { titulo: string; descripcion: string; tags: string[]; asignadoA: string[]; fechaInicio?: string; fechaFin?: string; tipo?: "PoC" | "Presentation" | "Run" | "Build" | ""; estado?: "todo" | "in_progress" | "done" }) => void;
   onDelete?: () => void;
   contextType: "initiative" | "project";
+  showStatusSelector?: boolean;
   initialData?: {
     titulo: string;
     descripcion: string;
@@ -17,10 +18,11 @@ interface TaskModalProps {
     fechaInicio?: string;
     fechaFin?: string;
     tipo?: string;
+    estado?: "todo" | "in_progress" | "done";
   };
 }
 
-export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSave, onDelete, contextType, initialData }) => {
+export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSave, onDelete, contextType, showStatusSelector = false, initialData }) => {
   const [title, setTitle] = useState(initialData?.titulo || "");
   const [description, setDescription] = useState(initialData?.descripcion || "");
   const [tagInput, setTagInput] = useState("");
@@ -29,6 +31,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSave, o
   const [startDate, setStartDate] = useState(initialData?.fechaInicio || "");
   const [endDate, setEndDate] = useState(initialData?.fechaFin || "");
   const [tipo, setTipo] = useState<"PoC" | "Presentation" | "Run" | "Build" | "">(initialData?.tipo as any || "");
+  const [estado, setEstado] = useState<"todo" | "in_progress" | "done">(initialData?.estado || "todo");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   React.useEffect(() => {
@@ -40,6 +43,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSave, o
       setStartDate(initialData?.fechaInicio || "");
       setEndDate(initialData?.fechaFin || "");
       setTipo(initialData?.tipo as any || "");
+      setEstado(initialData?.estado || "todo");
       setShowDeleteConfirm(false);
     }
   }, [isOpen, initialData]);
@@ -75,7 +79,8 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSave, o
         asignadoA,
         fechaInicio: startDate,
         fechaFin: endDate,
-        tipo
+        tipo,
+        estado: showStatusSelector ? estado : undefined,
       });
       setTitle("");
       setDescription("");
@@ -84,6 +89,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSave, o
       setStartDate("");
       setEndDate("");
       setTipo("");
+      setEstado("todo");
       onClose();
     }
   };
@@ -208,6 +214,21 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSave, o
                   )}
                 </select>
               </div>
+
+              {showStatusSelector && (
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">Estado</label>
+                  <select
+                    value={estado}
+                    onChange={(e) => setEstado(e.target.value as "todo" | "in_progress" | "done")}
+                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:border-zinc-900 transition-all cursor-pointer font-medium"
+                  >
+                    <option value="todo">Por iniciar</option>
+                    <option value="in_progress">En curso</option>
+                    <option value="done">Completada</option>
+                  </select>
+                </div>
+              )}
 
               <div className="space-y-2">
                 <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">{TASK_FIELDS.assignedTo}</label>

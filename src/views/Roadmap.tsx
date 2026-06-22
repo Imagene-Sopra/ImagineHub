@@ -230,13 +230,20 @@ export const Roadmap: React.FC = () => {
       .filter((value): value is string => !!value)
   );
 
+  const representedAssignees = new Set(
+    ganttTasks.flatMap((task) => task.asignadoA || []).filter((name) => !!name)
+  );
+
   const roadmapFilterOptions = [
     ...Object.entries(projects)
       .filter(([id, name]) => !!name && representedParentIds.has(`project:${id}`))
       .map(([id, name]) => ({ id: `project:${id}`, type: "project" as const, label: name })),
     ...Object.entries(initiatives)
       .filter(([id, name]) => !!name && representedParentIds.has(`initiative:${id}`))
-      .map(([id, name]) => ({ id: `initiative:${id}`, type: "initiative" as const, label: name }))
+      .map(([id, name]) => ({ id: `initiative:${id}`, type: "initiative" as const, label: name })),
+    ...Array.from(representedAssignees)
+      .sort((a, b) => a.localeCompare(b, "es", { sensitivity: "base" }))
+      .map((name) => ({ id: `assignee:${name}`, type: "assignee" as const, label: name }))
   ].sort((a, b) => a.label.localeCompare(b.label, "es", { sensitivity: "base" }));
 
   const filteredRoadmapTasks = ganttTasks.filter((task) => {
@@ -246,8 +253,10 @@ export const Roadmap: React.FC = () => {
       : task.iniciativaId
         ? `initiative:${task.iniciativaId}`
         : null;
-    if (!parentFilterId) return false;
-    return selectedRoadmapFilters.includes(parentFilterId);
+    const assigneeFilterIds = (task.asignadoA || []).map((name) => `assignee:${name}`);
+    const taskFilterIds = [parentFilterId, ...assigneeFilterIds].filter((value): value is string => !!value);
+    if (taskFilterIds.length === 0) return false;
+    return taskFilterIds.some((filterId) => selectedRoadmapFilters.includes(filterId));
   });
 
   const toggleRoadmapFilter = (filterId: string) => {
@@ -263,7 +272,7 @@ export const Roadmap: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  const handleSaveTask = async (data: { titulo: string; descripcion: string; tags: string[]; asignadoA: string[]; fechaInicio?: string; fechaFin?: string; tipo?: "PoC" | "Presentation" | "Run" | "Build" | "" }) => {
+  const handleSaveTask = async (data: { titulo: string; descripcion: string; tags: string[]; asignadoA: string[]; fechaInicio?: string; fechaFin?: string; tipo?: "PoC" | "Presentation" | "Run" | "Build" | ""; estado?: Task["estado"] }) => {
     if (!selectedTask) return;
     const taskPath = selectedTask.iniciativaId
       ? doc(db, "initiatives", selectedTask.iniciativaId, "tasks", selectedTask.id)
@@ -271,7 +280,8 @@ export const Roadmap: React.FC = () => {
         ? doc(db, "projects", selectedTask.proyectoId, "tasks", selectedTask.id)
         : null;
     if (!taskPath) return;
-    await updateDoc(taskPath, { ...data, updatedAt: new Date().toISOString() });
+    const { estado, ...taskData } = data;
+    await updateDoc(taskPath, { ...taskData, ...(estado ? { estado } : {}), updatedAt: new Date().toISOString() });
   };
 
   const handleDeleteTask = async () => {
@@ -319,27 +329,67 @@ export const Roadmap: React.FC = () => {
                 )}
               </summary>
               <div className="absolute right-0 top-full mt-2 w-72 max-h-64 overflow-auto rounded-xl border border-zinc-200 bg-white shadow-xl z-20 p-2">
-                <div className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider text-zinc-400">
-                  Proyectos e iniciativas
-                </div>
+
                 {roadmapFilterOptions.length === 0 ? (
                   <div className="px-2 py-2 text-xs text-zinc-500">No hay elementos para filtrar.</div>
                 ) : (
-                  roadmapFilterOptions.map((option) => (
-                    <label
-                      key={option.id}
-                      className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-zinc-50 cursor-pointer"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedRoadmapFilters.includes(option.id)}
-                        onChange={() => toggleRoadmapFilter(option.id)}
-                        className="rounded border-zinc-300 text-zinc-900 focus:ring-zinc-400"
-                      />
-                      <span className="text-xs text-zinc-700 truncate">{option.label}</span>
-                      <span className="text-[9px] text-zinc-400 uppercase ml-auto">{option.type === "project" ? "Proyecto" : "Iniciativa"}</span>
-                    </label>
-                  ))
+                  <div className="space-y-2">
+                    <div>
+                      <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                        Proyectos e iniciativas
+                      </div>
+                      {roadmapFilterOptions.filter((option) => option.type !== "assignee").length === 0 ? (
+                        <div className="px-2 py-2 text-xs text-zinc-500">No hay elementos para filtrar.</div>
+                      ) : (
+                        roadmapFilterOptions
+                          .filter((option) => option.type !== "assignee")
+                          .map((option) => (
+                            <label
+                              key={option.id}
+                              className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-zinc-50 cursor-pointer"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={selectedRoadmapFilters.includes(option.id)}
+                                onChange={() => toggleRoadmapFilter(option.id)}
+                                className="rounded border-zinc-300 text-zinc-900 focus:ring-zinc-400"
+                              />
+                              <span className="text-xs text-zinc-700 truncate">{option.label}</span>
+                              <span className="text-[9px] text-zinc-400 uppercase ml-auto">
+                                {option.type === "project" ? "Proyecto" : "Iniciativa"}
+                              </span>
+                            </label>
+                          ))
+                      )}
+                    </div>
+
+                    <div className="border-t border-zinc-100 pt-2">
+                      <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                        Asignado a
+                      </div>
+                      {roadmapFilterOptions.filter((option) => option.type === "assignee").length === 0 ? (
+                        <div className="px-2 py-2 text-xs text-zinc-500">No hay personas asignadas para filtrar.</div>
+                      ) : (
+                        roadmapFilterOptions
+                          .filter((option) => option.type === "assignee")
+                          .map((option) => (
+                            <label
+                              key={option.id}
+                              className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-zinc-50 cursor-pointer"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={selectedRoadmapFilters.includes(option.id)}
+                                onChange={() => toggleRoadmapFilter(option.id)}
+                                className="rounded border-zinc-300 text-zinc-900 focus:ring-zinc-400"
+                              />
+                              <span className="text-xs text-zinc-700 truncate">{option.label}</span>
+                              <span className="text-[9px] text-zinc-400 uppercase ml-auto">Asignado</span>
+                            </label>
+                          ))
+                      )}
+                    </div>
+                  </div>
                 )}
               </div>
             </details>
@@ -530,6 +580,7 @@ export const Roadmap: React.FC = () => {
           onSave={handleSaveTask}
           onDelete={handleDeleteTask}
           contextType={selectedTask.proyectoId ? "project" : "initiative"}
+          showStatusSelector
           initialData={{
             titulo: selectedTask.titulo,
             descripcion: selectedTask.descripcion || "",
@@ -538,6 +589,7 @@ export const Roadmap: React.FC = () => {
             fechaInicio: selectedTask.fechaInicio,
             fechaFin: selectedTask.fechaFin,
             tipo: selectedTask.tipo,
+            estado: selectedTask.estado,
           }}
         />
       )}
