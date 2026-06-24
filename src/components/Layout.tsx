@@ -47,7 +47,7 @@ export const Layout: React.FC = () => {
       <aside className="w-64 border-r border-zinc-100 flex flex-col p-4 bg-zinc-50/50">
         <div className="flex items-center justify-center px-4 mb-8">
           <img
-            src="logo.png"
+            src="/logo.png"
             alt="Imagine Hub"
             className="h-[calc(var(--spacing)*22)] w-auto object-contain"
             referrerPolicy="no-referrer"
@@ -66,7 +66,7 @@ export const Layout: React.FC = () => {
 
         <div className="mt-auto pt-8 flex justify-center">
           <img 
-            src="sopra_logo.png" 
+            src="/sopra_logo.png" 
             alt="Sopra Steria Logo" 
             className="h-8 object-contain opacity-60 hover:opacity-100 transition-opacity"
             referrerPolicy="no-referrer"
@@ -88,7 +88,7 @@ export const Layout: React.FC = () => {
             <div className="flex items-center gap-3">
               <div className="w-24 h-24 flex items-center justify-center overflow-hidden">
                 <img 
-                  src="aeroline.png" 
+                  src="/aeroline.png" 
                   alt="User Avatar" 
                   className="w-full h-full object-contain"
                   referrerPolicy="no-referrer"

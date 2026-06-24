@@ -1,11 +1,11 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { collectionGroup, query, onSnapshot, where, collection, doc, updateDoc, deleteDoc } from "firebase/firestore";
 import { db } from "../firebase";
 import { Task } from "../types";
 import { Map, Calendar, Clock, Rocket, Briefcase, AlertTriangle, ShieldAlert, Pencil } from "lucide-react";
 import { format, addMonths, startOfMonth, endOfMonth, eachMonthOfInterval, isWithinInterval, parseISO, isValid } from "date-fns";
 import { es } from "date-fns/locale";
-import { cn } from "../lib/utils";
+import { calculateStartDate, cn } from "../lib/utils";
 import { TaskModal } from "../components/TaskModal";
 
 export const Roadmap: React.FC = () => {
@@ -19,6 +19,8 @@ export const Roadmap: React.FC = () => {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedRoadmapFilters, setSelectedRoadmapFilters] = useState<string[]>([]);
+  const [isFilterMenuOpen, setIsFilterMenuOpen] = useState(false);
+  const filterMenuRef = useRef<HTMLDivElement | null>(null);
 
   const parseTaskDate = (value?: string) => {
     if (!value) return null;
@@ -33,7 +35,7 @@ export const Roadmap: React.FC = () => {
     const q = query(collectionGroup(db, "tasks"), where("estado", "in", ["todo", "in_progress"]));
     const unsub = onSnapshot(q, (snap) => {
       const taskList = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task))
-        .filter(t => t.fechaInicio || t.fechaFin); // Only tasks with dates
+        .filter(t => t.fechaInicio || t.fechaFin || (t.estimacion && t.fechaFin)); // Keep tasks visible when only end date + duration are provided
       setTasks(taskList);
       setLoading(false);
     });
@@ -58,6 +60,30 @@ export const Roadmap: React.FC = () => {
       unsub();
       unsubProjects();
       unsubInitiatives();
+    };
+  }, []);
+
+  useEffect(() => {
+    const handleDocumentClick = (event: MouseEvent) => {
+      if (!filterMenuRef.current) return;
+      const target = event.target as Node;
+      if (!filterMenuRef.current.contains(target)) {
+        setIsFilterMenuOpen(false);
+      }
+    };
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsFilterMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleDocumentClick);
+    document.addEventListener("keydown", handleEscape);
+
+    return () => {
+      document.removeEventListener("mousedown", handleDocumentClick);
+      document.removeEventListener("keydown", handleEscape);
     };
   }, []);
 
@@ -115,29 +141,53 @@ export const Roadmap: React.FC = () => {
 
   const timelineGridTemplate = `repeat(${months.length}, minmax(${MONTH_COLUMN_WIDTH}px, 1fr))`;
 
-  const getTaskPosition = (task: Task) => {
-    if (!task.fechaInicio && !task.fechaFin) return null;
-
-    const tStart = task.fechaInicio ? parseTaskDate(task.fechaInicio) : parseTaskDate(task.fechaFin);
-    const tEnd = task.fechaFin ? parseTaskDate(task.fechaFin) : parseTaskDate(task.fechaInicio);
-
-    if (!tStart || !tEnd) return null;
+  const getRangePosition = (rangeStart: Date, rangeEnd: Date) => {
+    const clampedStart = rangeStart.getTime() <= rangeEnd.getTime() ? rangeStart : rangeEnd;
+    const clampedEnd = rangeStart.getTime() <= rangeEnd.getTime() ? rangeEnd : rangeStart;
 
     const totalDays = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24);
     if (totalDays <= 0) return null;
-    
-    // Clamp to roadmap bounds
+
     const startOffset = Math.min(
       totalDays,
-      Math.max(0, (tStart.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
+      Math.max(0, (clampedStart.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
     );
-    const endOffset = Math.min(totalDays, (tEnd.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+    const endOffset = Math.min(totalDays, (clampedEnd.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
 
     if (startOffset > totalDays || endOffset < 0) return null;
 
+    const rawWidth = ((endOffset - startOffset) / totalDays) * 100;
+    const width = rawWidth <= 0 ? 0.6 : rawWidth;
+
     return {
       left: `${(startOffset / totalDays) * 100}%`,
-      width: `${((endOffset - startOffset) / totalDays) * 100}%`,
+      width: `${width}%`,
+    };
+  };
+
+  const getTaskRanges = (task: Task) => {
+    const plannedStart = task.fechaInicio ? parseTaskDate(task.fechaInicio) : null;
+    const plannedEnd = task.fechaFin ? parseTaskDate(task.fechaFin) : null;
+    const fallbackDate = plannedEnd || plannedStart;
+    const showOnlyDuration = !plannedStart && !!plannedEnd && !!task.estimacion && task.estimacion > 0;
+
+    const plannedRange = showOnlyDuration
+      ? null
+      : plannedStart && plannedEnd
+        ? getRangePosition(plannedStart, plannedEnd)
+        : fallbackDate
+          ? getRangePosition(fallbackDate, fallbackDate)
+          : null;
+
+    // Duration is anchored on end date and rendered even when start date is missing.
+    const durationRange = task.estimacion && task.estimacion > 0 && plannedEnd
+      ? getRangePosition(calculateStartDate(plannedEnd, task.estimacion), plannedEnd)
+      : null;
+
+    return {
+      plannedRange,
+      durationRange,
+      hasAnyRange: !!plannedRange || !!durationRange,
     };
   };
 
@@ -154,6 +204,22 @@ export const Roadmap: React.FC = () => {
         return "bg-red-100/80 hover:bg-red-200/80 border-red-300 text-red-950"; // Soft Red
       default:
         return "bg-zinc-100 hover:bg-zinc-200 border-zinc-300 text-zinc-950"; // Default Gray
+    }
+  };
+
+  const getTaskDurationColorClasses = (tipo?: string) => {
+    switch (tipo) {
+      case "PoC":
+        return "bg-indigo-300 border-indigo-500 text-indigo-950";
+      case "Presentation":
+      case "Presentación":
+        return "bg-purple-300 border-purple-500 text-purple-950";
+      case "Build":
+        return "bg-amber-300 border-amber-500 text-amber-950";
+      case "Run":
+        return "bg-red-300 border-red-500 text-red-950";
+      default:
+        return "bg-zinc-300 border-zinc-500 text-zinc-950";
     }
   };
 
@@ -216,7 +282,7 @@ export const Roadmap: React.FC = () => {
     })
     .sort((a, b) => b.score - a.score);
 
-  const ganttTasks = roadmapTasks.filter((task) => !!getTaskPosition(task));
+  const ganttTasks = roadmapTasks.filter((task) => getTaskRanges(task).hasAnyRange);
 
   const representedParentIds = new Set(
     ganttTasks
@@ -272,7 +338,7 @@ export const Roadmap: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  const handleSaveTask = async (data: { titulo: string; descripcion: string; tags: string[]; asignadoA: string[]; fechaInicio?: string; fechaFin?: string; tipo?: "PoC" | "Presentation" | "Run" | "Build" | ""; estado?: Task["estado"] }) => {
+  const handleSaveTask = async (data: { titulo: string; descripcion: string; tags: string[]; asignadoA: string[]; fechaInicio?: string; fechaFin?: string; tipo?: "PoC" | "Presentation" | "Run" | "Build" | ""; estado?: Task["estado"]; estimacion?: number }) => {
     if (!selectedTask) return;
     const taskPath = selectedTask.iniciativaId
       ? doc(db, "initiatives", selectedTask.iniciativaId, "tasks", selectedTask.id)
@@ -319,15 +385,20 @@ export const Roadmap: React.FC = () => {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <details className="relative group">
-              <summary className="list-none cursor-pointer text-[10px] font-bold uppercase tracking-wider px-2.5 py-1.5 rounded-full border border-zinc-200 text-zinc-600 hover:text-zinc-900 hover:border-zinc-300 bg-white transition-colors">
+            <div className="relative" ref={filterMenuRef}>
+              <button
+                type="button"
+                onClick={() => setIsFilterMenuOpen((prev) => !prev)}
+                className="cursor-pointer text-[10px] font-bold uppercase tracking-wider px-2.5 py-1.5 rounded-full border border-zinc-200 text-zinc-600 hover:text-zinc-900 hover:border-zinc-300 bg-white transition-colors"
+              >
                 Filtrar
                 {selectedRoadmapFilters.length > 0 && (
                   <span className="ml-1.5 inline-flex items-center justify-center min-w-4 h-4 px-1 rounded-full bg-zinc-900 text-white text-[9px] leading-none">
                     {selectedRoadmapFilters.length}
                   </span>
                 )}
-              </summary>
+              </button>
+              {isFilterMenuOpen && (
               <div className="absolute right-0 top-full mt-2 w-72 max-h-64 overflow-auto rounded-xl border border-zinc-200 bg-white shadow-xl z-20 p-2">
 
                 {roadmapFilterOptions.length === 0 ? (
@@ -392,7 +463,8 @@ export const Roadmap: React.FC = () => {
                   </div>
                 )}
               </div>
-            </details>
+              )}
+            </div>
 
             {/* Core Legend of Types */}
             <div className="flex flex-wrap items-center gap-2 bg-zinc-50 p-3 rounded-2xl border border-zinc-150">
@@ -470,8 +542,8 @@ export const Roadmap: React.FC = () => {
                   {/* Tasks with high visibility horizontal separation lines */}
                   <div className="divide-y divide-zinc-200">
                     {filteredRoadmapTasks.map((task) => {
-                      const pos = getTaskPosition(task);
-                      if (!pos) return null;
+                      const { plannedRange, durationRange, hasAnyRange } = getTaskRanges(task);
+                      if (!hasAnyRange) return null;
                       const parentName = getParentName(task);
                       const fullTitle = parentName ? `${parentName} - ${task.titulo}` : task.titulo;
 
@@ -531,6 +603,11 @@ export const Roadmap: React.FC = () => {
                                 )}>
                                   Punt. {task.score}
                                 </span>
+                                {task.estimacion && task.estimacion > 0 && (
+                                  <span className="text-[9px] bg-orange-100 px-1 rounded text-orange-700 border border-orange-300/80 font-semibold">
+                                    Duración: {task.estimacion}d
+                                  </span>
+                                )}
                               </div>
                               {task.tags?.map((tag, i) => (
                                 <span key={i} className="text-[9px] bg-zinc-100 px-1 rounded text-zinc-500 border border-zinc-200/40">
@@ -545,22 +622,42 @@ export const Roadmap: React.FC = () => {
                             </div>
                           </div>
 
-                          <div className="flex-1 relative h-12 flex items-center bg-zinc-50/20 min-w-0">
-                            <div
-                              className={cn(
-                                "absolute h-6 rounded-lg shadow-sm flex items-center justify-center border transition-all cursor-pointer",
-                                getTaskColorClasses(task.tipo)
-                              )}
-                              style={{
-                                left: pos.left,
-                                width: pos.width,
-                              }}
-                              title={`${fullTitle} (${getTaskStatusLabel(task.estado)}) | Punt.: ${task.score}${task.tipo ? ` | Tipo: ${task.tipo === 'Presentation' ? 'Presentación' : task.tipo}` : ''}`}
-                            >
-                              <span className="px-2 text-[9px] font-bold uppercase tracking-wide truncate max-w-full whitespace-nowrap">
-                                {getTaskStatusLabel(task.estado)}
-                              </span>
-                            </div>
+                          <div className="flex-1 relative h-14 flex items-center bg-zinc-50/20 min-w-0">
+                            {plannedRange && (
+                              <div
+                                className={cn(
+                                  "absolute h-5 top-2 rounded-md shadow-sm flex items-center justify-center border transition-all cursor-pointer",
+                                  getTaskColorClasses(task.tipo)
+                                )}
+                                style={{
+                                  left: plannedRange.left,
+                                  width: plannedRange.width,
+                                }}
+                                title={`${fullTitle} (${getTaskStatusLabel(task.estado)}) | Plan: ${task.fechaInicio || "-"} - ${task.fechaFin || "-"} | Punt.: ${task.score}${task.tipo ? ` | Tipo: ${task.tipo === 'Presentation' ? 'Presentación' : task.tipo}` : ''}`}
+                              >
+                                <span className="px-2 text-[9px] font-bold uppercase tracking-wide truncate max-w-full whitespace-nowrap">
+                                  {getTaskStatusLabel(task.estado)}
+                                </span>
+                              </div>
+                            )}
+
+                            {durationRange && (
+                              <div
+                                className={cn(
+                                  "absolute h-5 top-7 rounded-md shadow-sm flex items-center justify-center border transition-all cursor-pointer",
+                                  getTaskDurationColorClasses(task.tipo)
+                                )}
+                                style={{
+                                  left: durationRange.left,
+                                  width: durationRange.width,
+                                }}
+                                title={`${fullTitle} | Duración estimada: ${task.estimacion} día${task.estimacion === 1 ? "" : "s"} laborables (desde fecha fin)`}
+                              >
+                                <span className="px-2 text-[9px] font-black uppercase tracking-wide truncate max-w-full whitespace-nowrap">
+                                  Dur. {task.estimacion}d
+                                </span>
+                              </div>
+                            )}
                           </div>
                         </div>
                       );
@@ -588,6 +685,7 @@ export const Roadmap: React.FC = () => {
             asignadoA: selectedTask.asignadoA || [],
             fechaInicio: selectedTask.fechaInicio,
             fechaFin: selectedTask.fechaFin,
+            estimacion: selectedTask.estimacion,
             tipo: selectedTask.tipo,
             estado: selectedTask.estado,
           }}

@@ -19,6 +19,8 @@ export const CONFIRM_DELETE_TASK = {
   ...CONFIRM_DELETE,
 };
 
+export const TASK_DELETE_PASSWORD = "HubSopra";
+
 export const CONFIRM_DELETE_INITIATIVE = {
   message: "¿Eliminar iniciativa?",
   ...CONFIRM_DELETE,

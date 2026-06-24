@@ -6,7 +6,7 @@ import { Project, Task } from "../types";
 import { Plus, Sparkles, ChevronLeft, Trash2, Loader2, Pencil, Lock, Unlock, User, GripVertical } from "lucide-react";
 import { geminiService } from "../services/geminiService";
 import { cn } from "../lib/utils";
-import { CONFIRM_DELETE_TASK } from "../lib/constants";
+import { CONFIRM_DELETE_TASK, TASK_DELETE_PASSWORD } from "../lib/constants";
 import { TaskModal } from "../components/TaskModal";
 import {
   DndContext,
@@ -28,6 +28,8 @@ import { CSS } from "@dnd-kit/utilities";
 
 const SortableTaskCard = ({ task, status, onMove, onDelete, onGenerate, onEditTask }: any) => {
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deletePassword, setDeletePassword] = useState("");
+  const [deletePasswordError, setDeletePasswordError] = useState("");
   const {
     attributes,
     listeners,
@@ -70,7 +72,11 @@ const SortableTaskCard = ({ task, status, onMove, onDelete, onGenerate, onEditTa
             <Pencil size={14} />
           </button>
           <button 
-            onClick={() => setConfirmDelete(true)}
+            onClick={() => {
+              setConfirmDelete(true);
+              setDeletePassword("");
+              setDeletePasswordError("");
+            }}
             className="p-1 text-zinc-400 hover:text-red-500"
             title="Eliminar tarea"
           >
@@ -81,15 +87,38 @@ const SortableTaskCard = ({ task, status, onMove, onDelete, onGenerate, onEditTa
       {confirmDelete && (
         <div className="absolute inset-0 z-10 bg-white/95 rounded-xl flex flex-col items-center justify-center gap-3 p-4">
           <p className="text-sm font-bold text-zinc-800">{CONFIRM_DELETE_TASK.message}</p>
+          <input
+            type="password"
+            value={deletePassword}
+            onChange={(e) => {
+              setDeletePassword(e.target.value);
+              if (deletePasswordError) setDeletePasswordError("");
+            }}
+            placeholder="Contraseña de borrado"
+            className="w-full max-w-[220px] px-3 py-2 text-xs bg-white border border-zinc-300 rounded-lg focus:outline-none focus:border-zinc-500"
+          />
+          {deletePasswordError && (
+            <p className="text-[11px] text-red-600 font-medium">{deletePasswordError}</p>
+          )}
           <div className="flex gap-2">
             <button
-              onClick={() => setConfirmDelete(false)}
+              onClick={() => {
+                setConfirmDelete(false);
+                setDeletePassword("");
+                setDeletePasswordError("");
+              }}
               className="px-3 py-1.5 text-xs font-bold border border-zinc-300 rounded-lg text-zinc-600 hover:bg-zinc-100 transition-colors"
             >
               {CONFIRM_DELETE_TASK.cancel}
             </button>
             <button
-              onClick={() => onDelete(task.id)}
+              onClick={() => {
+                if (deletePassword !== TASK_DELETE_PASSWORD) {
+                  setDeletePasswordError("Contraseña incorrecta.");
+                  return;
+                }
+                onDelete(task.id);
+              }}
               className="px-3 py-1.5 text-xs font-bold bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
             >
               {CONFIRM_DELETE_TASK.accept}
@@ -136,6 +165,14 @@ const SortableTaskCard = ({ task, status, onMove, onDelete, onGenerate, onEditTa
               Fin: {task.fechaFin}
             </span>
           )}
+        </div>
+      )}
+
+      {task.estimacion && (
+        <div className="mb-4 ml-6 flex">
+          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold border shadow-sm bg-cyan-100 border-cyan-300 text-cyan-800">
+            Estimación: {task.estimacion}d
+          </span>
         </div>
       )}
 
@@ -272,7 +309,7 @@ export const ProjectDetail: React.FC = () => {
     setIsTaskModalOpen(true);
   };
 
-  const handleSaveTask = async (data: { titulo: string; descripcion: string; tags: string[]; asignadoA: string[]; fechaInicio?: string; fechaFin?: string; tipo?: "PoC" | "Presentation" | "Run" | "Build" | "" }) => {
+  const handleSaveTask = async (data: { titulo: string; descripcion: string; tags: string[]; asignadoA: string[]; fechaInicio?: string; fechaFin?: string; tipo?: "PoC" | "Presentation" | "Run" | "Build" | ""; estimacion?: number }) => {
     if (!id) return;
 
     if (taskToEdit) {
@@ -499,6 +536,7 @@ export const ProjectDetail: React.FC = () => {
           fechaInicio: taskToEdit.fechaInicio,
           fechaFin: taskToEdit.fechaFin,
           tipo: taskToEdit.tipo,
+          estimacion: taskToEdit.estimacion,
         } : undefined}
       />
     </div>

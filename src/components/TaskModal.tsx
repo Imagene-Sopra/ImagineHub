@@ -1,12 +1,12 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { X, Plus, Tag as TagIcon, Trash2, User } from "lucide-react";
-import { CONFIRM_DELETE_TASK, TASK_FIELDS } from "../lib/constants";
+import { CONFIRM_DELETE_TASK, TASK_DELETE_PASSWORD, TASK_FIELDS } from "../lib/constants";
 
 interface TaskModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (data: { titulo: string; descripcion: string; tags: string[]; asignadoA: string[]; fechaInicio?: string; fechaFin?: string; tipo?: "PoC" | "Presentation" | "Run" | "Build" | ""; estado?: "todo" | "in_progress" | "done" }) => void;
+  onSave: (data: { titulo: string; descripcion: string; tags: string[]; asignadoA: string[]; fechaInicio?: string; fechaFin?: string; tipo?: "PoC" | "Presentation" | "Run" | "Build" | ""; estado?: "todo" | "in_progress" | "done"; estimacion?: number }) => void;
   onDelete?: () => void;
   contextType: "initiative" | "project";
   showStatusSelector?: boolean;
@@ -19,6 +19,7 @@ interface TaskModalProps {
     fechaFin?: string;
     tipo?: string;
     estado?: "todo" | "in_progress" | "done";
+    estimacion?: number;
   };
 }
 
@@ -32,7 +33,10 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSave, o
   const [endDate, setEndDate] = useState(initialData?.fechaFin || "");
   const [tipo, setTipo] = useState<"PoC" | "Presentation" | "Run" | "Build" | "">(initialData?.tipo as any || "");
   const [estado, setEstado] = useState<"todo" | "in_progress" | "done">(initialData?.estado || "todo");
+  const [estimacion, setEstimacion] = useState<number | undefined>(initialData?.estimacion);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deletePassword, setDeletePassword] = useState("");
+  const [deletePasswordError, setDeletePasswordError] = useState("");
 
   React.useEffect(() => {
     if (isOpen) {
@@ -44,7 +48,10 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSave, o
       setEndDate(initialData?.fechaFin || "");
       setTipo(initialData?.tipo as any || "");
       setEstado(initialData?.estado || "todo");
+      setEstimacion(initialData?.estimacion);
       setShowDeleteConfirm(false);
+      setDeletePassword("");
+      setDeletePasswordError("");
     }
   }, [isOpen, initialData]);
 
@@ -72,7 +79,17 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSave, o
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (title.trim()) {
-      onSave({
+      const payload: {
+        titulo: string;
+        descripcion: string;
+        tags: string[];
+        asignadoA: string[];
+        fechaInicio?: string;
+        fechaFin?: string;
+        tipo?: "PoC" | "Presentation" | "Run" | "Build" | "";
+        estado?: "todo" | "in_progress" | "done";
+        estimacion?: number;
+      } = {
         titulo: title.trim(),
         descripcion: description.trim(),
         tags,
@@ -80,8 +97,17 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSave, o
         fechaInicio: startDate,
         fechaFin: endDate,
         tipo,
-        estado: showStatusSelector ? estado : undefined,
-      });
+      };
+
+      if (showStatusSelector) {
+        payload.estado = estado;
+      }
+
+      if (typeof estimacion === "number" && estimacion > 0) {
+        payload.estimacion = estimacion;
+      }
+
+      onSave(payload);
       setTitle("");
       setDescription("");
       setTags([]);
@@ -90,6 +116,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSave, o
       setEndDate("");
       setTipo("");
       setEstado("todo");
+      setEstimacion(undefined);
       onClose();
     }
   };
@@ -130,17 +157,44 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSave, o
                 <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex flex-col gap-3">
                   <p className="text-sm font-bold text-red-700">{CONFIRM_DELETE_TASK.message}</p>
                   <p className="text-xs text-red-500">{CONFIRM_DELETE_TASK.warning}</p>
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-red-600">Contraseña de borrado</label>
+                    <input
+                      type="password"
+                      value={deletePassword}
+                      onChange={(e) => {
+                        setDeletePassword(e.target.value);
+                        if (deletePasswordError) setDeletePasswordError("");
+                      }}
+                      placeholder="Introduce la contraseña"
+                      className="w-full px-3 py-2 text-sm bg-white border border-red-200 rounded-lg focus:outline-none focus:border-red-400"
+                    />
+                    {deletePasswordError && (
+                      <p className="text-[11px] text-red-600 font-medium">{deletePasswordError}</p>
+                    )}
+                  </div>
                   <div className="flex gap-2 justify-end">
                     <button
                       type="button"
-                      onClick={() => setShowDeleteConfirm(false)}
+                      onClick={() => {
+                        setShowDeleteConfirm(false);
+                        setDeletePassword("");
+                        setDeletePasswordError("");
+                      }}
                       className="px-4 py-2 text-xs font-bold border border-zinc-300 rounded-lg text-zinc-600 hover:bg-zinc-100 transition-colors"
                     >
                       {CONFIRM_DELETE_TASK.cancel}
                     </button>
                     <button
                       type="button"
-                      onClick={() => { onDelete!(); onClose(); }}
+                      onClick={() => {
+                        if (deletePassword !== TASK_DELETE_PASSWORD) {
+                          setDeletePasswordError("Contraseña incorrecta.");
+                          return;
+                        }
+                        onDelete!();
+                        onClose();
+                      }}
                       className="px-4 py-2 text-xs font-bold bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
                     >
                       {CONFIRM_DELETE_TASK.accept}
@@ -191,6 +245,18 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSave, o
                     className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:border-zinc-900 transition-all"
                   />
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">Estimación (d)</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={estimacion || ""}
+                  onChange={(e) => setEstimacion(e.target.value ? parseInt(e.target.value) : undefined)}
+                  placeholder="Días de trabajo requeridos"
+                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:border-zinc-900 transition-all"
+                />
               </div>
 
               <div className="space-y-2">

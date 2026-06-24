@@ -44,6 +44,7 @@ export interface Task {
   fechaInicio?: string;
   fechaFin?: string;
   tipo?: "PoC" | "Presentation" | "Run" | "Build" | "";
+  estimacion?: number;
 }
 
 export interface Session {
