@@ -622,11 +622,11 @@ export const Roadmap: React.FC = () => {
                             </div>
                           </div>
 
-                          <div className="flex-1 relative h-14 flex items-center bg-zinc-50/20 min-w-0">
+                          <div className="flex-1 relative h-12 flex items-center bg-zinc-50/20 min-w-0">
                             {plannedRange && (
                               <div
                                 className={cn(
-                                  "absolute h-5 top-2 rounded-md shadow-sm flex items-center justify-center border transition-all cursor-pointer",
+                                  "absolute z-10 h-5 top-1/2 -translate-y-1/2 rounded-md shadow-sm flex items-center justify-center border transition-all cursor-pointer",
                                   getTaskColorClasses(task.tipo)
                                 )}
                                 style={{
@@ -634,17 +634,13 @@ export const Roadmap: React.FC = () => {
                                   width: plannedRange.width,
                                 }}
                                 title={`${fullTitle} (${getTaskStatusLabel(task.estado)}) | Plan: ${task.fechaInicio || "-"} - ${task.fechaFin || "-"} | Punt.: ${task.score}${task.tipo ? ` | Tipo: ${task.tipo === 'Presentation' ? 'Presentación' : task.tipo}` : ''}`}
-                              >
-                                <span className="px-2 text-[9px] font-bold uppercase tracking-wide truncate max-w-full whitespace-nowrap">
-                                  {getTaskStatusLabel(task.estado)}
-                                </span>
-                              </div>
+                              />
                             )}
 
                             {durationRange && (
                               <div
                                 className={cn(
-                                  "absolute h-5 top-7 rounded-md shadow-sm flex items-center justify-center border transition-all cursor-pointer",
+                                  "absolute z-20 h-5 top-1/2 -translate-y-1/2 rounded-md shadow-sm flex items-center justify-center border transition-all cursor-pointer",
                                   getTaskDurationColorClasses(task.tipo)
                                 )}
                                 style={{
@@ -652,9 +648,19 @@ export const Roadmap: React.FC = () => {
                                   width: durationRange.width,
                                 }}
                                 title={`${fullTitle} | Duración estimada: ${task.estimacion} día${task.estimacion === 1 ? "" : "s"} laborables (desde fecha fin)`}
+                              />
+                            )}
+
+                            {plannedRange && (
+                              <div
+                                className="absolute z-30 h-5 top-1/2 -translate-y-1/2 flex items-center justify-center pointer-events-none"
+                                style={{
+                                  left: plannedRange.left,
+                                  width: plannedRange.width,
+                                }}
                               >
-                                <span className="px-2 text-[9px] font-black uppercase tracking-wide truncate max-w-full whitespace-nowrap">
-                                  Dur. {task.estimacion}d
+                                <span className="px-2 text-[9px] font-bold uppercase tracking-wide truncate max-w-full whitespace-nowrap text-zinc-950 drop-shadow-[0_1px_0_rgba(255,255,255,0.7)]">
+                                  {getTaskStatusLabel(task.estado)}
                                 </span>
                               </div>
                             )}
