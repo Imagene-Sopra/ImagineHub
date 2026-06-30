@@ -163,6 +163,8 @@ export const Roadmap: React.FC = () => {
 
   const timelineGridTemplate = `repeat(${months.length}, minmax(${MONTH_COLUMN_WIDTH}px, 1fr))`;
 
+  const normalizePersonName = (name: string) => name.trim().toLocaleLowerCase("es");
+
   const vacationsByPerson = useMemo(() => {
     const grouped = new Map<string, Vacation[]>();
 
@@ -179,6 +181,55 @@ export const Roadmap: React.FC = () => {
       }))
       .sort((a, b) => a.person.localeCompare(b.person, "es", { sensitivity: "base" }));
   }, [vacations]);
+
+  const vacationRangesByPerson = useMemo(() => {
+    const grouped = new Map<string, Vacation[]>();
+
+    vacations.forEach((vacation) => {
+      const personKey = normalizePersonName(vacation.persona);
+      if (!personKey) return;
+      grouped.set(personKey, [...(grouped.get(personKey) || []), vacation]);
+    });
+
+    return grouped;
+  }, [vacations]);
+
+  const getTaskDateInterval = (task: Task) => {
+    const plannedStart = task.fechaInicio ? parseTaskDate(task.fechaInicio) : null;
+    const plannedEnd = task.fechaFin ? parseTaskDate(task.fechaFin) : null;
+
+    if (plannedStart && plannedEnd) {
+      return plannedStart.getTime() <= plannedEnd.getTime()
+        ? { start: plannedStart, end: plannedEnd }
+        : { start: plannedEnd, end: plannedStart };
+    }
+
+    if (!plannedStart && plannedEnd && task.estimacion && task.estimacion > 0) {
+      return { start: calculateStartDate(plannedEnd, task.estimacion), end: plannedEnd };
+    }
+
+    const fallbackDate = plannedStart || plannedEnd;
+    return fallbackDate ? { start: fallbackDate, end: fallbackDate } : null;
+  };
+
+  const rangesOverlap = (startA: Date, endA: Date, startB: Date, endB: Date) =>
+    startA.getTime() <= endB.getTime() && startB.getTime() <= endA.getTime();
+
+  const getAssigneeVacationConflict = (task: Task, assigneeName: string) => {
+    const taskInterval = getTaskDateInterval(task);
+    if (!taskInterval) return null;
+
+    const personVacations = vacationRangesByPerson.get(normalizePersonName(assigneeName)) || [];
+    return personVacations.find((vacation) => {
+      const vacationStart = parseTaskDate(vacation.fechaInicio);
+      const vacationEnd = parseTaskDate(vacation.fechaFin);
+      if (!vacationStart || !vacationEnd) return false;
+
+      const orderedVacationStart = vacationStart.getTime() <= vacationEnd.getTime() ? vacationStart : vacationEnd;
+      const orderedVacationEnd = vacationStart.getTime() <= vacationEnd.getTime() ? vacationEnd : vacationStart;
+      return rangesOverlap(taskInterval.start, taskInterval.end, orderedVacationStart, orderedVacationEnd);
+    }) || null;
+  };
 
   const getRangePosition = (rangeStart: Date, rangeEnd: Date) => {
     const clampedStart = rangeStart.getTime() <= rangeEnd.getTime() ? rangeStart : rangeEnd;
@@ -768,11 +819,25 @@ export const Roadmap: React.FC = () => {
                                   {tag}
                                 </span>
                               ))}
-                              {task.asignadoA?.map((name, i) => (
-                                <span key={i} className="text-[9px] bg-blue-50 px-1 rounded text-blue-600 border border-blue-200/60">
-                                  {name}
-                                </span>
-                              ))}
+                              {task.asignadoA?.map((name, i) => {
+                                const vacationConflict = getAssigneeVacationConflict(task, name);
+
+                                return (
+                                  <span
+                                    key={i}
+                                    className={cn(
+                                      "inline-flex items-center gap-1 text-[9px] px-1 rounded border font-medium",
+                                      vacationConflict
+                                        ? "bg-yellow-50 text-yellow-700 border-yellow-300"
+                                        : "bg-blue-50 text-blue-600 border-blue-200/60"
+                                    )}
+                                    title={vacationConflict ? `${name} tiene vacaciones del ${vacationConflict.fechaInicio} al ${vacationConflict.fechaFin}` : name}
+                                  >
+                                    {vacationConflict && <AlertTriangle size={10} className="shrink-0 text-yellow-600" />}
+                                    {name}
+                                  </span>
+                                );
+                              })}
                             </div>
                           </div>
 
