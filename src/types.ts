@@ -93,3 +93,11 @@ export interface News {
   usuarioId: string;
   createdAt: string;
 }
+
+export interface Vacation {
+  id: string;
+  persona: string;
+  fechaInicio: string;
+  fechaFin: string;
+  createdAt: string;
+}

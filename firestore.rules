@@ -50,5 +50,9 @@ service cloud.firestore {
     match /news/{newsId} {
       allow read, write: if true;
     }
+
+    match /vacations/{vacationId} {
+      allow read, write: if true;
+    }
   }
 }

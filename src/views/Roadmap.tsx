@@ -1,12 +1,15 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { collectionGroup, query, onSnapshot, where, collection, doc, updateDoc, deleteDoc } from "firebase/firestore";
+import { collectionGroup, query, onSnapshot, where, collection, doc, updateDoc, deleteDoc, addDoc } from "firebase/firestore";
 import { db } from "../firebase";
-import { Task } from "../types";
-import { Map, Calendar, Clock, Rocket, Briefcase, AlertTriangle, ShieldAlert, Pencil } from "lucide-react";
+import { Task, Vacation } from "../types";
+import { Map as MapIcon, Calendar, Clock, Rocket, Briefcase, AlertTriangle, ShieldAlert, Pencil, Umbrella, ChevronDown, ChevronRight, X, Plus } from "lucide-react";
 import { format, addMonths, startOfMonth, endOfMonth, eachMonthOfInterval, isWithinInterval, parseISO, isValid } from "date-fns";
 import { es } from "date-fns/locale";
 import { calculateStartDate, cn } from "../lib/utils";
 import { TaskModal } from "../components/TaskModal";
+
+const VACATION_PARENT_ID = "roadmap-vacations";
+const vacationCollectionRef = () => collection(db, "initiatives", VACATION_PARENT_ID, "tasks");
 
 export const Roadmap: React.FC = () => {
   const MONTH_COLUMN_WIDTH = 176;
@@ -21,6 +24,13 @@ export const Roadmap: React.FC = () => {
   const [selectedRoadmapFilters, setSelectedRoadmapFilters] = useState<string[]>([]);
   const [isFilterMenuOpen, setIsFilterMenuOpen] = useState(false);
   const filterMenuRef = useRef<HTMLDivElement | null>(null);
+
+  const [vacations, setVacations] = useState<Vacation[]>([]);
+  const [vacationsCollapsed, setVacationsCollapsed] = useState(false);
+  const [isVacationModalOpen, setIsVacationModalOpen] = useState(false);
+  const [vacationForm, setVacationForm] = useState({ persona: "", fechaInicio: "", fechaFin: "" });
+  const [vacationFormError, setVacationFormError] = useState("");
+  const [vacationSubmitting, setVacationSubmitting] = useState(false);
 
   const parseTaskDate = (value?: string) => {
     if (!value) return null;
@@ -56,10 +66,15 @@ export const Roadmap: React.FC = () => {
       setInitiatives(initMap);
     });
 
+    const unsubVacations = onSnapshot(vacationCollectionRef(), (snap) => {
+      setVacations(snap.docs.map(d => ({ id: d.id, ...d.data() } as Vacation)));
+    });
+
     return () => {
       unsub();
       unsubProjects();
       unsubInitiatives();
+      unsubVacations();
     };
   }, []);
 
@@ -103,7 +118,14 @@ export const Roadmap: React.FC = () => {
       .map((value) => parseTaskDate(value))
       .filter((date): date is Date => !!date);
 
-    if (taskDates.length === 0) {
+    const vacationDates = vacations
+      .flatMap((v) => [v.fechaInicio, v.fechaFin])
+      .map((value) => parseTaskDate(value))
+      .filter((date): date is Date => !!date);
+
+    const allDates = [...taskDates, ...vacationDates];
+
+    if (allDates.length === 0) {
       const now = new Date();
       const monthStart = startOfMonth(now);
       const monthEnd = endOfMonth(now);
@@ -114,10 +136,10 @@ export const Roadmap: React.FC = () => {
       };
     }
 
-    let minDate = taskDates[0];
-    let maxDate = taskDates[0];
+    let minDate = allDates[0];
+    let maxDate = allDates[0];
 
-    taskDates.forEach((date) => {
+    allDates.forEach((date) => {
       if (date.getTime() < minDate.getTime()) minDate = date;
       if (date.getTime() > maxDate.getTime()) maxDate = date;
     });
@@ -132,7 +154,7 @@ export const Roadmap: React.FC = () => {
       endDate: finalEnd,
       months: eachMonthOfInterval({ start: rangeStart, end: finalEnd }),
     };
-  }, [tasks]);
+  }, [tasks, vacations]);
 
   const roadmapRangeLabel =
     months.length > 0
@@ -140,6 +162,23 @@ export const Roadmap: React.FC = () => {
       : "";
 
   const timelineGridTemplate = `repeat(${months.length}, minmax(${MONTH_COLUMN_WIDTH}px, 1fr))`;
+
+  const vacationsByPerson = useMemo(() => {
+    const grouped = new Map<string, Vacation[]>();
+
+    vacations.forEach((vacation) => {
+      const person = vacation.persona.trim();
+      if (!person) return;
+      grouped.set(person, [...(grouped.get(person) || []), vacation]);
+    });
+
+    return Array.from(grouped.entries())
+      .map(([person, personVacations]) => ({
+        person,
+        vacations: personVacations.sort((a, b) => a.fechaInicio.localeCompare(b.fechaInicio)),
+      }))
+      .sort((a, b) => a.person.localeCompare(b.person, "es", { sensitivity: "base" }));
+  }, [vacations]);
 
   const getRangePosition = (rangeStart: Date, rangeEnd: Date) => {
     const clampedStart = rangeStart.getTime() <= rangeEnd.getTime() ? rangeStart : rangeEnd;
@@ -333,6 +372,41 @@ export const Roadmap: React.FC = () => {
     );
   };
 
+  const allAssignees = useMemo(() => {
+    const names = new Set(tasks.flatMap((t) => t.asignadoA || []).filter(Boolean));
+    return Array.from(names).sort((a, b) => a.localeCompare(b, "es", { sensitivity: "base" }));
+  }, [tasks]);
+
+  const handleSaveVacation = async () => {
+    if (!vacationForm.persona || !vacationForm.fechaInicio || !vacationForm.fechaFin) {
+      setVacationFormError("Todos los campos son obligatorios.");
+      return;
+    }
+    if (vacationForm.fechaInicio > vacationForm.fechaFin) {
+      setVacationFormError("La fecha de inicio debe ser anterior o igual a la fecha de fin.");
+      return;
+    }
+    setVacationSubmitting(true);
+    try {
+      await addDoc(vacationCollectionRef(), {
+        kind: "vacation",
+        persona: vacationForm.persona,
+        fechaInicio: vacationForm.fechaInicio,
+        fechaFin: vacationForm.fechaFin,
+        createdAt: new Date().toISOString(),
+      });
+      setIsVacationModalOpen(false);
+      setVacationForm({ persona: "", fechaInicio: "", fechaFin: "" });
+      setVacationFormError("");
+    } finally {
+      setVacationSubmitting(false);
+    }
+  };
+
+  const handleDeleteVacation = async (vacationId: string) => {
+    await deleteDoc(doc(db, "initiatives", VACATION_PARENT_ID, "tasks", vacationId));
+  };
+
   const handleEditTask = (task: Task) => {
     setSelectedTask(task);
     setIsModalOpen(true);
@@ -375,7 +449,7 @@ export const Roadmap: React.FC = () => {
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-2">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-blue-600 text-white rounded-xl">
-              <Map size={24} />
+              <MapIcon size={24} />
             </div>
             <div>
               <h1 className="text-2xl font-bold text-zinc-900">Roadmap de Tareas</h1>
@@ -474,6 +548,15 @@ export const Roadmap: React.FC = () => {
               <span className="text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider border shadow-sm bg-purple-50 border-purple-200 text-purple-700">Presentación</span>
               <span className="text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider border shadow-sm bg-indigo-50 border-indigo-200 text-indigo-700">PoC</span>
             </div>
+
+            <button
+              type="button"
+              onClick={() => { setVacationForm({ persona: allAssignees[0] || "", fechaInicio: "", fechaFin: "" }); setVacationFormError(""); setIsVacationModalOpen(true); }}
+              className="cursor-pointer flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1.5 rounded-full border border-teal-200 text-teal-700 bg-teal-50 hover:bg-teal-100 hover:border-teal-300 transition-colors"
+            >
+              <Umbrella size={12} />
+              Añadir vacaciones
+            </button>
           </div>
         </div>
       </div>
@@ -541,6 +624,77 @@ export const Roadmap: React.FC = () => {
 
                   {/* Tasks with high visibility horizontal separation lines */}
                   <div className="divide-y divide-zinc-200">
+
+                    {/* Vacation rows section */}
+                    {vacations.length > 0 && (
+                      <>
+                        <div
+                          className="flex items-center border-b border-teal-200 bg-teal-50/60 cursor-pointer select-none"
+                          onClick={() => setVacationsCollapsed((prev) => !prev)}
+                        >
+                          <div className="w-64 border-r border-teal-200 p-3 sticky left-0 bg-teal-50/80 z-10 flex-shrink-0 flex items-center gap-2">
+                            {vacationsCollapsed ? <ChevronRight size={13} className="text-teal-600" /> : <ChevronDown size={13} className="text-teal-600" />}
+                            <Umbrella size={13} className="text-teal-600" />
+                            <span className="text-xs font-bold text-teal-800 uppercase tracking-wide">
+                              Vacaciones ({vacations.length})
+                            </span>
+                          </div>
+                          <div className="flex-1 h-8" />
+                        </div>
+
+                        {!vacationsCollapsed && vacationsByPerson.map((personGroup) => (
+                            <div key={personGroup.person} className="flex items-center group hover:bg-teal-50/40 border-b border-teal-100/60 last:border-b-0 transition-colors">
+                              <div className="w-64 border-r border-teal-100 p-3 sticky left-0 bg-white z-10 group-hover:bg-teal-50/40 transition-colors flex-shrink-0">
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className="flex items-center gap-1.5 min-w-0">
+                                    <Umbrella size={11} className="text-teal-500 shrink-0" />
+                                    <span className="text-xs font-semibold text-zinc-800 truncate">{personGroup.person}</span>
+                                  </div>
+                                  <span className="shrink-0 text-[9px] font-bold uppercase tracking-wide text-teal-600 bg-teal-50 border border-teal-100 rounded px-1.5 py-0.5">
+                                    {personGroup.vacations.length} tramo{personGroup.vacations.length === 1 ? "" : "s"}
+                                  </span>
+                                </div>
+                                <div className="flex flex-wrap gap-1 mt-1">
+                                  {personGroup.vacations.map((vacation) => (
+                                    <span key={vacation.id} className="inline-flex items-center gap-1 text-[9px] text-teal-600 font-medium bg-teal-50 border border-teal-100 rounded px-1">
+                                      {vacation.fechaInicio} → {vacation.fechaFin}
+                                      <button
+                                        onClick={(e) => { e.stopPropagation(); handleDeleteVacation(vacation.id); }}
+                                        className="rounded hover:bg-red-50 text-teal-300 hover:text-red-400 transition-colors"
+                                        title="Eliminar vacaciones"
+                                      >
+                                        <X size={9} />
+                                      </button>
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                              <div className="flex-1 relative h-14 flex items-center min-w-0">
+                                {personGroup.vacations.map((vacation) => {
+                                  const vStart = parseTaskDate(vacation.fechaInicio);
+                                  const vEnd = parseTaskDate(vacation.fechaFin);
+                                  const vRange = vStart && vEnd ? getRangePosition(vStart, vEnd) : null;
+                                  if (!vRange) return null;
+
+                                  return (
+                                    <div
+                                      key={vacation.id}
+                                      className="absolute z-10 h-5 top-1/2 -translate-y-1/2 rounded-md border border-teal-300 bg-teal-100 shadow-sm flex items-center justify-center"
+                                      style={{ left: vRange.left, width: vRange.width }}
+                                      title={`Vacaciones de ${personGroup.person}: ${vacation.fechaInicio} - ${vacation.fechaFin}`}
+                                    >
+                                      <span className="px-2 text-[9px] font-bold uppercase tracking-wide truncate max-w-full whitespace-nowrap text-teal-800 drop-shadow-[0_1px_0_rgba(255,255,255,0.7)]">
+                                        {personGroup.person}
+                                      </span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                        ))}
+                      </>
+                    )}
+
                     {filteredRoadmapTasks.map((task) => {
                       const { plannedRange, durationRange, hasAnyRange } = getTaskRanges(task);
                       if (!hasAnyRange) return null;
@@ -696,6 +850,93 @@ export const Roadmap: React.FC = () => {
             estado: selectedTask.estado,
           }}
         />
+      )}
+
+      {/* Vacation Modal */}
+      {isVacationModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl border border-zinc-200 w-full max-w-sm mx-4 overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-100">
+              <div className="flex items-center gap-2">
+                <Umbrella size={18} className="text-teal-600" />
+                <h2 className="text-base font-bold text-zinc-900">Añadir vacaciones</h2>
+              </div>
+              <button
+                onClick={() => { setIsVacationModalOpen(false); setVacationFormError(""); }}
+                className="p-1.5 rounded-lg hover:bg-zinc-100 text-zinc-500 hover:text-zinc-800 transition-colors"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="px-6 py-5 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-zinc-700 mb-1.5">Persona</label>
+                {allAssignees.length > 0 ? (
+                  <select
+                    value={vacationForm.persona}
+                    onChange={(e) => setVacationForm((prev) => ({ ...prev, persona: e.target.value }))}
+                    className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-teal-400 bg-white"
+                  >
+                    {allAssignees.map((name) => (
+                      <option key={name} value={name}>{name}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    type="text"
+                    placeholder="Nombre de la persona"
+                    value={vacationForm.persona}
+                    onChange={(e) => setVacationForm((prev) => ({ ...prev, persona: e.target.value }))}
+                    className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-teal-400"
+                  />
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-zinc-700 mb-1.5">Fecha inicio</label>
+                  <input
+                    type="date"
+                    value={vacationForm.fechaInicio}
+                    onChange={(e) => setVacationForm((prev) => ({ ...prev, fechaInicio: e.target.value }))}
+                    className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-teal-400"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-zinc-700 mb-1.5">Fecha fin</label>
+                  <input
+                    type="date"
+                    value={vacationForm.fechaFin}
+                    onChange={(e) => setVacationForm((prev) => ({ ...prev, fechaFin: e.target.value }))}
+                    className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-teal-400"
+                  />
+                </div>
+              </div>
+
+              {vacationFormError && (
+                <p className="text-xs text-red-500 font-medium">{vacationFormError}</p>
+              )}
+            </div>
+
+            <div className="px-6 pb-5 flex justify-end gap-2">
+              <button
+                onClick={() => { setIsVacationModalOpen(false); setVacationFormError(""); }}
+                className="px-4 py-2 text-sm font-semibold rounded-lg border border-zinc-200 text-zinc-700 hover:bg-zinc-50 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleSaveVacation}
+                disabled={vacationSubmitting}
+                className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold rounded-lg bg-teal-600 text-white hover:bg-teal-700 transition-colors disabled:opacity-60"
+              >
+                <Plus size={14} />
+                Guardar
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
