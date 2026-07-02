@@ -1066,9 +1066,9 @@ export const Roadmap: React.FC = () => {
                           >
                             <div className="flex items-center gap-2 mb-1">
                               {task.proyectoId ? (
-                                <Briefcase size={12} className="text-zinc-450" />
+                                <Briefcase size={12} className="text-zinc-450 shrink-0" />
                               ) : (
-                                <Rocket size={12} className="text-zinc-450" />
+                                <Rocket size={12} className="text-zinc-450 shrink-0" />
                               )}
                               <button
                                 onClick={() => handleEditTask(task)}
@@ -1203,7 +1203,7 @@ export const Roadmap: React.FC = () => {
                     {filteredNoDateTasks.length > 0 && (
                       <>
                         <div
-                          className="group relative flex items-center bg-white hover:bg-zinc-100/70 cursor-pointer select-none transition-colors"
+                          className="group relative flex items-center bg-white hover:bg-zinc-100 cursor-pointer select-none transition-colors"
                           onClick={() => setNoDateTasksCollapsed((prev) => !prev)}
                         >
                           <div className="absolute inset-x-0 top-0 h-px bg-zinc-200 pointer-events-none" style={{ zIndex: LAYERS.rowDivider }} />
@@ -1217,7 +1217,7 @@ export const Roadmap: React.FC = () => {
                               Sin fechas ({filteredNoDateTasks.length})
                             </span>
                           </div>
-                          <div className="grid flex-1 h-8 bg-white group-hover:bg-zinc-100/60 divide-x divide-zinc-200 transition-colors" style={{ gridTemplateColumns: timelineGridTemplate }}>
+                          <div className="grid flex-1 h-8 bg-white group-hover:bg-zinc-100 divide-x divide-zinc-200 transition-colors" style={{ gridTemplateColumns: timelineGridTemplate }}>
                             {months.map((_, idx) => (
                               <div key={idx} className="h-full" />
                             ))}
@@ -1237,9 +1237,9 @@ export const Roadmap: React.FC = () => {
                               >
                                 <div className="flex items-center gap-2 mb-1">
                                   {task.proyectoId ? (
-                                    <Briefcase size={12} className="text-zinc-450" />
+                                    <Briefcase size={12} className="text-zinc-450 shrink-0" />
                                   ) : (
-                                    <Rocket size={12} className="text-zinc-450" />
+                                    <Rocket size={12} className="text-zinc-450 shrink-0" />
                                   )}
                                   <button
                                     onClick={() => handleEditTask(task)}
@@ -1296,7 +1296,7 @@ export const Roadmap: React.FC = () => {
                                 </div>
                               </div>
 
-                              <div className="flex-1 relative h-12 flex items-center bg-white group-hover:bg-zinc-100/70 min-w-0 overflow-hidden transition-colors px-3" />
+                              <div className="flex-1 relative h-12 flex items-center bg-white group-hover:bg-zinc-50 min-w-0 overflow-hidden transition-colors px-3" />
                             </div>
                           );
                         })}
