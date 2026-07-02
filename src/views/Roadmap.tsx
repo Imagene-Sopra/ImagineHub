@@ -1149,7 +1149,7 @@ export const Roadmap: React.FC = () => {
 
       {/* Vacation Modal */}
       {isVacationModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl border border-zinc-200 w-full max-w-sm mx-4 overflow-hidden">
             <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-100">
               <div className="flex items-center gap-2">
