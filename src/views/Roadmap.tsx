@@ -2,8 +2,8 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { collectionGroup, query, onSnapshot, where, collection, doc, updateDoc, deleteDoc, addDoc } from "firebase/firestore";
 import { db } from "../firebase";
 import { Task, Vacation } from "../types";
-import { Map as MapIcon, Calendar, Clock, Rocket, Briefcase, AlertTriangle, ShieldAlert, Pencil, Umbrella, ChevronDown, ChevronRight, X, Plus } from "lucide-react";
-import { format, addMonths, startOfMonth, endOfMonth, eachMonthOfInterval, isWithinInterval, parseISO, isValid } from "date-fns";
+import { Map as MapIcon, Calendar, Clock, Rocket, Briefcase, AlertTriangle, ShieldAlert, Pencil, Umbrella, ChevronDown, ChevronRight, X, Plus, Minus } from "lucide-react";
+import { format, addMonths, startOfMonth, endOfMonth, eachMonthOfInterval, parseISO, isValid, differenceInCalendarMonths, getDaysInMonth } from "date-fns";
 import { es } from "date-fns/locale";
 import { calculateStartDate, cn } from "../lib/utils";
 import { TaskModal } from "../components/TaskModal";
@@ -12,8 +12,12 @@ const VACATION_PARENT_ID = "roadmap-vacations";
 const vacationCollectionRef = () => collection(db, "initiatives", VACATION_PARENT_ID, "tasks");
 
 export const Roadmap: React.FC = () => {
-  const MONTH_COLUMN_WIDTH = 176;
-  const MIN_VISIBLE_MONTHS = 6;
+  const FALLBACK_MONTH_COLUMN_WIDTH = 176;
+  const FIRST_COLUMN_WIDTH = 256;
+  const INITIAL_VISIBLE_MONTHS = 3;
+  const MIN_VISIBLE_MONTH_COLUMNS = 1;
+  const MAX_VISIBLE_MONTH_COLUMNS = 12;
+  const MIN_VISIBLE_MONTHS = 3;
 
   const [tasks, setTasks] = useState<Task[]>([]);
   const [projects, setProjects] = useState<Record<string, string>>({});
@@ -26,11 +30,16 @@ export const Roadmap: React.FC = () => {
   const filterMenuRef = useRef<HTMLDivElement | null>(null);
 
   const [vacations, setVacations] = useState<Vacation[]>([]);
-  const [vacationsCollapsed, setVacationsCollapsed] = useState(false);
+  const [vacationsCollapsed, setVacationsCollapsed] = useState(true);
   const [isVacationModalOpen, setIsVacationModalOpen] = useState(false);
   const [vacationForm, setVacationForm] = useState({ persona: "", fechaInicio: "", fechaFin: "" });
   const [vacationFormError, setVacationFormError] = useState("");
   const [vacationSubmitting, setVacationSubmitting] = useState(false);
+  const [selectedYear, setSelectedYear] = useState<number | null>(null);
+  const [visibleMonthColumns, setVisibleMonthColumns] = useState(INITIAL_VISIBLE_MONTHS);
+  const roadmapScrollRef = useRef<HTMLDivElement | null>(null);
+  const hasInitializedRoadmapScroll = useRef(false);
+  const [roadmapViewportWidth, setRoadmapViewportWidth] = useState(0);
 
   const parseTaskDate = (value?: string) => {
     if (!value) return null;
@@ -112,7 +121,72 @@ export const Roadmap: React.FC = () => {
     return "";
   };
 
+  const taskYears = useMemo(() => {
+    const years = new Set<number>();
+
+    tasks.forEach((task) => {
+      const plannedStart = task.fechaInicio ? parseTaskDate(task.fechaInicio) : null;
+      const plannedEnd = task.fechaFin ? parseTaskDate(task.fechaFin) : null;
+
+      let intervalStart: Date | null = null;
+      let intervalEnd: Date | null = null;
+
+      if (plannedStart && plannedEnd) {
+        if (plannedStart.getTime() <= plannedEnd.getTime()) {
+          intervalStart = plannedStart;
+          intervalEnd = plannedEnd;
+        } else {
+          intervalStart = plannedEnd;
+          intervalEnd = plannedStart;
+        }
+      } else if (!plannedStart && plannedEnd && task.estimacion && task.estimacion > 0) {
+        intervalStart = calculateStartDate(plannedEnd, task.estimacion);
+        intervalEnd = plannedEnd;
+      } else if (plannedStart || plannedEnd) {
+        intervalStart = plannedStart || plannedEnd;
+        intervalEnd = plannedStart || plannedEnd;
+      }
+
+      if (!intervalStart || !intervalEnd) return;
+
+      const startYear = Math.min(intervalStart.getFullYear(), intervalEnd.getFullYear());
+      const endYear = Math.max(intervalStart.getFullYear(), intervalEnd.getFullYear());
+
+      for (let year = startYear; year <= endYear; year += 1) {
+        years.add(year);
+      }
+    });
+
+    return Array.from(years).sort((a, b) => a - b);
+  }, [tasks]);
+
+  useEffect(() => {
+    if (taskYears.length === 0) {
+      setSelectedYear(null);
+      return;
+    }
+
+    if (selectedYear !== null && taskYears.includes(selectedYear)) return;
+
+    const currentYear = new Date().getFullYear();
+    setSelectedYear(taskYears.includes(currentYear) ? currentYear : taskYears[taskYears.length - 1]);
+  }, [taskYears, selectedYear]);
+
   const { startDate, endDate, months } = useMemo(() => {
+    if (selectedYear !== null) {
+      const yearStart = startOfMonth(new Date(selectedYear, 0, 1));
+      const yearEnd = endOfMonth(new Date(selectedYear, 11, 1));
+      return {
+        startDate: yearStart,
+        endDate: yearEnd,
+        months: eachMonthOfInterval({ start: yearStart, end: yearEnd }),
+      };
+    }
+
+    const today = new Date();
+    const anchorPrevMonth = startOfMonth(addMonths(today, -1));
+    const anchorNextMonth = endOfMonth(addMonths(today, 1));
+
     const taskDates = tasks
       .flatMap((task) => [task.fechaInicio, task.fechaFin])
       .map((value) => parseTaskDate(value))
@@ -123,7 +197,7 @@ export const Roadmap: React.FC = () => {
       .map((value) => parseTaskDate(value))
       .filter((date): date is Date => !!date);
 
-    const allDates = [...taskDates, ...vacationDates];
+    const allDates = [...taskDates, ...vacationDates, anchorPrevMonth, anchorNextMonth];
 
     if (allDates.length === 0) {
       const now = new Date();
@@ -154,14 +228,110 @@ export const Roadmap: React.FC = () => {
       endDate: finalEnd,
       months: eachMonthOfInterval({ start: rangeStart, end: finalEnd }),
     };
-  }, [tasks, vacations]);
+  }, [tasks, vacations, selectedYear]);
 
   const roadmapRangeLabel =
     months.length > 0
       ? `${format(months[0], "MMMM yyyy", { locale: es })} - ${format(months[months.length - 1], "MMMM yyyy", { locale: es })}`
       : "";
 
-  const timelineGridTemplate = `repeat(${months.length}, minmax(${MONTH_COLUMN_WIDTH}px, 1fr))`;
+  useEffect(() => {
+    if (!roadmapScrollRef.current) return;
+
+    const element = roadmapScrollRef.current;
+    const updateViewportWidth = () => {
+      setRoadmapViewportWidth(element.clientWidth);
+    };
+
+    updateViewportWidth();
+
+    if (typeof ResizeObserver !== "undefined") {
+      const resizeObserver = new ResizeObserver(() => {
+        updateViewportWidth();
+      });
+      resizeObserver.observe(element);
+      return () => resizeObserver.disconnect();
+    }
+
+    window.addEventListener("resize", updateViewportWidth);
+    return () => window.removeEventListener("resize", updateViewportWidth);
+  }, []);
+
+  const monthColumnWidth = useMemo(() => {
+    if (roadmapViewportWidth <= FIRST_COLUMN_WIDTH) {
+      return FALLBACK_MONTH_COLUMN_WIDTH;
+    }
+
+    return Math.max(
+      1,
+      Math.floor((roadmapViewportWidth - FIRST_COLUMN_WIDTH) / visibleMonthColumns)
+    );
+  }, [roadmapViewportWidth, visibleMonthColumns]);
+
+  const monthLabelFormat = monthColumnWidth < 120 ? "MMM" : "MMMM";
+
+  useEffect(() => {
+    hasInitializedRoadmapScroll.current = false;
+  }, [selectedYear]);
+
+  useEffect(() => {
+    if (hasInitializedRoadmapScroll.current) return;
+    if (loading) return;
+    if (!roadmapScrollRef.current || months.length === 0) return;
+    if (roadmapViewportWidth <= FIRST_COLUMN_WIDTH) return;
+
+    const currentMonthStart = startOfMonth(new Date());
+    const currentMonthIndex = months.findIndex(
+      (month) =>
+        month.getFullYear() === currentMonthStart.getFullYear() &&
+        month.getMonth() === currentMonthStart.getMonth()
+    );
+
+    const previousMonthIndex = currentMonthIndex > 0 ? currentMonthIndex - 1 : 0;
+    const targetScrollLeft = previousMonthIndex * monthColumnWidth;
+
+    requestAnimationFrame(() => {
+      if (!roadmapScrollRef.current) return;
+      roadmapScrollRef.current.scrollLeft = targetScrollLeft;
+    });
+    hasInitializedRoadmapScroll.current = true;
+  }, [loading, months, monthColumnWidth, roadmapViewportWidth]);
+
+  const timelineGridTemplate = `repeat(${months.length}, ${monthColumnWidth}px)`;
+
+  const getMonthGridProgress = (
+    rawDate: Date,
+    options?: { inclusiveEnd?: boolean; includeTime?: boolean }
+  ) => {
+    if (months.length === 0) return 0;
+
+    const minTime = startDate.getTime();
+    const maxTime = endDate.getTime();
+    const clampedTime = Math.min(maxTime, Math.max(minTime, rawDate.getTime()));
+    const date = new Date(clampedTime);
+
+    const monthIndex = Math.max(
+      0,
+      Math.min(
+        months.length - 1,
+        differenceInCalendarMonths(startOfMonth(date), startOfMonth(startDate))
+      )
+    );
+
+    const secondsInDay = 24 * 60 * 60;
+    const timeFraction = options?.includeTime
+      ? (date.getHours() * 3600 + date.getMinutes() * 60 + date.getSeconds()) / secondsInDay
+      : 0;
+
+    const dayOffset = date.getDate() - 1 + timeFraction + (options?.inclusiveEnd ? 1 : 0);
+    const monthFraction = Math.max(0, Math.min(1, dayOffset / getDaysInMonth(date)));
+
+    return Math.max(0, Math.min(1, (monthIndex + monthFraction) / months.length));
+  };
+
+  const todayLineProgress = useMemo(() => {
+    return getMonthGridProgress(new Date(), { includeTime: true });
+  }, [startDate, endDate, months.length]);
 
   const normalizePersonName = (name: string) => name.trim().toLocaleLowerCase("es");
 
@@ -235,22 +405,14 @@ export const Roadmap: React.FC = () => {
     const clampedStart = rangeStart.getTime() <= rangeEnd.getTime() ? rangeStart : rangeEnd;
     const clampedEnd = rangeStart.getTime() <= rangeEnd.getTime() ? rangeEnd : rangeStart;
 
-    const totalDays = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24);
-    if (totalDays <= 0) return null;
+    const startProgress = getMonthGridProgress(clampedStart);
+    const endProgress = getMonthGridProgress(clampedEnd, { inclusiveEnd: true });
 
-    const startOffset = Math.min(
-      totalDays,
-      Math.max(0, (clampedStart.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
-    );
-    const endOffset = Math.min(totalDays, (clampedEnd.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-
-    if (startOffset > totalDays || endOffset < 0) return null;
-
-    const rawWidth = ((endOffset - startOffset) / totalDays) * 100;
+    const rawWidth = (endProgress - startProgress) * 100;
     const width = rawWidth <= 0 ? 0.6 : rawWidth;
 
     return {
-      left: `${(startOffset / totalDays) * 100}%`,
+      left: `${startProgress * 100}%`,
       width: `${width}%`,
     };
   };
@@ -372,7 +534,12 @@ export const Roadmap: React.FC = () => {
     })
     .sort((a, b) => b.score - a.score);
 
-  const ganttTasks = roadmapTasks.filter((task) => getTaskRanges(task).hasAnyRange);
+  const ganttTasks = roadmapTasks.filter((task) => {
+    if (!getTaskRanges(task).hasAnyRange) return false;
+    const interval = getTaskDateInterval(task);
+    if (!interval) return false;
+    return rangesOverlap(interval.start, interval.end, startDate, endDate);
+  });
 
   const representedParentIds = new Set(
     ganttTasks
@@ -592,7 +759,7 @@ export const Roadmap: React.FC = () => {
             </div>
 
             {/* Core Legend of Types */}
-            <div className="flex flex-wrap items-center gap-2 bg-zinc-50 p-3 rounded-2xl border border-zinc-150">
+            <div className="flex flex-wrap items-center gap-2 bg-zinc-50 p-3 rounded-2xl border border-zinc-200">
               <span className="text-[10px] font-black uppercase text-zinc-400 tracking-wider mr-1">Leyenda:</span>
               <span className="text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider border shadow-sm bg-red-50 border-red-200 text-red-600">Run</span>
               <span className="text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider border shadow-sm bg-amber-100 border-amber-300 text-amber-800">Build</span>
@@ -608,62 +775,120 @@ export const Roadmap: React.FC = () => {
               <Umbrella size={12} />
               Añadir vacaciones
             </button>
+
           </div>
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto p-8">
+      <div ref={roadmapScrollRef} className="flex-1 overflow-auto">
         {loading ? (
           <div className="flex items-center justify-center h-64">
             <Clock className="animate-spin text-zinc-300" size={32} />
           </div>
         ) : tasks.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-64 bg-white rounded-3xl border border-dashed border-zinc-200">
+          <div className="flex flex-col items-center justify-center h-64 bg-white rounded-none border border-dashed border-zinc-200">
             <Calendar className="text-zinc-200 mb-4" size={48} />
             <p className="text-zinc-500 font-medium">No hay tareas por iniciar o en curso con fechas programadas</p>
           </div>
         ) : (
-          <div className="bg-white rounded-3xl border border-zinc-200 shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
-              <div className="min-w-max">
+          <div className="bg-white rounded-none border border-zinc-200 border-r-0 border-b-0">
+            <div className="min-w-max border-b border-zinc-200">
                 {/* Header Months */}
-                <div className="flex border-b border-zinc-200">
-                  <div className="w-64 border-r border-zinc-200 p-4 font-bold text-zinc-500 text-xs uppercase tracking-wider sticky left-0 bg-white z-10">
-                    Tarea / Proyecto
+                <div className="flex border-b border-zinc-200 sticky top-0 z-50 bg-white">
+                  <div className="w-64 border-l border-r border-zinc-200 p-3 sticky left-0 bg-white z-50">
+                    <div className="flex flex-col gap-1.5">
+                      <div className="flex items-center">
+                        <span className="font-bold text-zinc-500 text-xs uppercase tracking-wider">Tarea / Proyecto</span>
+                      </div>
+
+                      <div className="flex items-center justify-between gap-2">
+                        {taskYears.length > 0 ? (
+                          <div className="flex items-center gap-1">
+                            <span className="text-[9px] font-bold uppercase tracking-wider text-zinc-500">Año</span>
+                            <div className="rounded-full border border-zinc-200 bg-white px-2 py-0.5">
+                              <select
+                                value={selectedYear ?? ""}
+                                onChange={(e) => setSelectedYear(Number(e.target.value))}
+                                aria-label="Seleccionar año"
+                                className="w-auto min-w-[3.25rem] text-[11px] font-semibold text-zinc-700 bg-transparent focus:outline-none"
+                              >
+                                {taskYears.map((year) => (
+                                  <option key={year} value={year}>{year}</option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
+                        ) : (
+                          <div />
+                        )}
+
+                        <div className="flex items-center gap-1 rounded-full border border-zinc-200 bg-white px-1 py-0.5">
+                          <button
+                            type="button"
+                            onClick={() => setVisibleMonthColumns((prev) => Math.min(MAX_VISIBLE_MONTH_COLUMNS, prev + 1))}
+                            disabled={visibleMonthColumns >= MAX_VISIBLE_MONTH_COLUMNS}
+                            className="cursor-pointer inline-flex items-center justify-center h-5 w-5 rounded-full border border-zinc-200 text-zinc-600 hover:text-zinc-900 hover:border-zinc-300 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                            title="Añadir una columna de mes"
+                          >
+                            <Minus size={11} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setVisibleMonthColumns((prev) => Math.max(MIN_VISIBLE_MONTH_COLUMNS, prev - 1))}
+                            disabled={visibleMonthColumns <= MIN_VISIBLE_MONTH_COLUMNS}
+                            className="cursor-pointer inline-flex items-center justify-center h-5 w-5 rounded-full border border-zinc-200 text-zinc-600 hover:text-zinc-900 hover:border-zinc-300 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                            title="Quitar una columna de mes"
+                          >
+                            <Plus size={11} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                  <div className="grid flex-1" style={{ gridTemplateColumns: timelineGridTemplate }}>
+                  <div className="relative grid flex-1" style={{ gridTemplateColumns: timelineGridTemplate }}>
+                    <div className="absolute inset-0 grid pointer-events-none z-20" style={{ gridTemplateColumns: timelineGridTemplate }}>
+                      {months.map((_, idx) => (
+                        <div key={idx} className="border-r border-zinc-200" />
+                      ))}
+                    </div>
                     {months.map((month, idx) => (
                       <div
                         key={idx}
-                        className="p-4 border-r border-zinc-200 text-center font-bold text-zinc-900 border-b-2 border-transparent"
+                        className={cn(
+                          "relative z-10 text-center font-bold text-zinc-900 overflow-hidden transition-[padding] duration-150",
+                          monthColumnWidth < 120 ? "px-2 py-3" : "p-4"
+                        )}
+                        title={format(month, "MMMM yyyy", { locale: es })}
                       >
-                        <span className="capitalize">{format(month, "MMMM", { locale: es })}</span>
-                        <span className="text-[10px] text-zinc-400 block tracking-widest">{format(month, "yyyy")}</span>
+                        <span className="capitalize block truncate">{format(month, monthLabelFormat, { locale: es })}</span>
+                        <span className="text-[10px] text-zinc-400 block tracking-widest truncate">{format(month, "yyyy")}</span>
                       </div>
                     ))}
                   </div>
                 </div>
 
-                {/* Timeline View */}
-                <div className="relative">
+              {/* Timeline View */}
+              <div className="relative bg-white">
                   {/* Grid Lines with high visibility */}
-                  <div className="absolute inset-0 flex pointer-events-none">
-                    <div className="w-64 border-r border-zinc-200 sticky left-0 bg-white z-10 transition-colors"></div>
+                  <div className="absolute inset-0 flex pointer-events-none z-[1]">
+                    <div className="w-64 border-l border-r border-zinc-200 sticky left-0 bg-white z-20 transition-colors"></div>
                     <div className="grid flex-1" style={{ gridTemplateColumns: timelineGridTemplate }}>
                       {months.map((_, idx) => (
-                        <div key={idx} className="border-r border-zinc-200/70"></div>
+                        <div key={idx} className="border-r border-zinc-200"></div>
                       ))}
                     </div>
                   </div>
 
                   {/* Today Line Overlay */}
-                  <div className="absolute inset-y-0 left-0 right-0 pointer-events-none flex" style={{ zIndex: 5 }}>
-                    <div className="w-64 sticky left-0 bg-transparent flex-shrink-0"></div>
-                    <div className="flex-1 relative h-full min-w-0">
+                  <div
+                    className="absolute inset-y-0 right-0 pointer-events-none overflow-hidden"
+                    style={{ left: `${FIRST_COLUMN_WIDTH}px`, zIndex: 2 }}
+                  >
+                    <div className="relative h-full min-w-0">
                       <div
                         className="absolute inset-y-0 w-0.5 bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.4)] flex flex-col items-center"
                         style={{
-                          left: `${(Math.max(0, Math.min(1, (new Date().getTime() - startDate.getTime()) / (endDate.getTime() - startDate.getTime())))) * 100}%`
+                          left: `${todayLineProgress * 100}%`
                         }}
                       >
                         <div className="bg-red-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow-md whitespace-nowrap mt-2 transform -translate-y-1">
@@ -674,28 +899,32 @@ export const Roadmap: React.FC = () => {
                   </div>
 
                   {/* Tasks with high visibility horizontal separation lines */}
-                  <div className="divide-y divide-zinc-200">
+                  <div className="relative divide-y divide-zinc-200 bg-white">
 
                     {/* Vacation rows section */}
                     {vacations.length > 0 && (
                       <>
                         <div
-                          className="flex items-center border-b border-teal-200 bg-teal-50/60 cursor-pointer select-none"
+                          className="flex items-center bg-teal-50/60 cursor-pointer select-none"
                           onClick={() => setVacationsCollapsed((prev) => !prev)}
                         >
-                          <div className="w-64 border-r border-teal-200 p-3 sticky left-0 bg-teal-50/80 z-10 flex-shrink-0 flex items-center gap-2">
+                          <div className="w-64 border-l border-r border-zinc-200 p-3 sticky left-0 bg-teal-50 z-30 flex-shrink-0 flex items-center gap-2">
                             {vacationsCollapsed ? <ChevronRight size={13} className="text-teal-600" /> : <ChevronDown size={13} className="text-teal-600" />}
                             <Umbrella size={13} className="text-teal-600" />
                             <span className="text-xs font-bold text-teal-800 uppercase tracking-wide">
                               Vacaciones ({vacations.length})
                             </span>
                           </div>
-                          <div className="flex-1 h-8" />
+                          <div className="grid flex-1 h-8 bg-teal-50 divide-x divide-zinc-200" style={{ gridTemplateColumns: timelineGridTemplate }}>
+                            {months.map((_, idx) => (
+                              <div key={idx} className="h-full" />
+                            ))}
+                          </div>
                         </div>
 
                         {!vacationsCollapsed && vacationsByPerson.map((personGroup) => (
-                            <div key={personGroup.person} className="flex items-center group hover:bg-teal-50/40 border-b border-teal-100/60 last:border-b-0 transition-colors">
-                              <div className="w-64 border-r border-teal-100 p-3 sticky left-0 bg-white z-10 group-hover:bg-teal-50/40 transition-colors flex-shrink-0">
+                            <div key={personGroup.person} className="flex items-center group hover:bg-teal-50 transition-colors">
+                              <div className="w-64 border-l border-r border-zinc-200 p-3 sticky left-0 bg-white z-30 group-hover:bg-teal-50 transition-colors flex-shrink-0">
                                 <div className="flex items-center justify-between gap-2">
                                   <div className="flex items-center gap-1.5 min-w-0">
                                     <Umbrella size={11} className="text-teal-500 shrink-0" />
@@ -720,7 +949,7 @@ export const Roadmap: React.FC = () => {
                                   ))}
                                 </div>
                               </div>
-                              <div className="flex-1 relative h-14 flex items-center min-w-0">
+                              <div className="flex-1 relative h-14 flex items-center min-w-0 overflow-hidden bg-white group-hover:bg-teal-50 transition-colors">
                                 {personGroup.vacations.map((vacation) => {
                                   const vStart = parseTaskDate(vacation.fechaInicio);
                                   const vEnd = parseTaskDate(vacation.fechaFin);
@@ -749,12 +978,13 @@ export const Roadmap: React.FC = () => {
                     {filteredRoadmapTasks.map((task) => {
                       const { plannedRange, durationRange, hasAnyRange } = getTaskRanges(task);
                       if (!hasAnyRange) return null;
+                      const statusLabelRange = plannedRange || durationRange;
                       const parentName = getParentName(task);
                       const fullTitle = parentName ? `${parentName} - ${task.titulo}` : task.titulo;
 
                       return (
-                        <div key={task.id} className="flex items-center group hover:bg-zinc-50 border-b border-zinc-200/60 last:border-b-0 transition-colors">
-                          <div className="w-64 border-r border-zinc-200 p-4 sticky left-0 bg-white z-10 group-hover:bg-zinc-50 transition-colors flex-shrink-0">
+                        <div key={task.id} className="flex items-center group hover:bg-zinc-50 transition-colors">
+                          <div className="w-64 border-l border-r border-zinc-200 p-4 sticky left-0 bg-white z-30 group-hover:bg-zinc-50 transition-colors flex-shrink-0">
                             <div className="flex items-center gap-2 mb-1">
                               {task.proyectoId ? (
                                 <Briefcase size={12} className="text-zinc-450" />
@@ -841,7 +1071,7 @@ export const Roadmap: React.FC = () => {
                             </div>
                           </div>
 
-                          <div className="flex-1 relative h-12 flex items-center bg-zinc-50/20 min-w-0">
+                          <div className="flex-1 relative h-12 flex items-center bg-white group-hover:bg-zinc-50 min-w-0 overflow-hidden transition-colors">
                             {plannedRange && (
                               <div
                                 className={cn(
@@ -870,12 +1100,12 @@ export const Roadmap: React.FC = () => {
                               />
                             )}
 
-                            {plannedRange && (
+                            {statusLabelRange && (
                               <div
-                                className="absolute z-30 h-5 top-1/2 -translate-y-1/2 flex items-center justify-center pointer-events-none"
+                                className="absolute z-20 h-5 top-1/2 -translate-y-1/2 flex items-center justify-center pointer-events-none"
                                 style={{
-                                  left: plannedRange.left,
-                                  width: plannedRange.width,
+                                  left: statusLabelRange.left,
+                                  width: statusLabelRange.width,
                                 }}
                               >
                                 <span className="px-2 text-[9px] font-bold uppercase tracking-wide truncate max-w-full whitespace-nowrap text-zinc-950 drop-shadow-[0_1px_0_rgba(255,255,255,0.7)]">
@@ -888,8 +1118,8 @@ export const Roadmap: React.FC = () => {
                       );
                     })}
                   </div>
-                </div>
               </div>
+
             </div>
           </div>
         )}
