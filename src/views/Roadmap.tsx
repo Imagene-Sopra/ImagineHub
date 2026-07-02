@@ -790,8 +790,8 @@ export const Roadmap: React.FC = () => {
             <p className="text-zinc-500 font-medium">No hay tareas por iniciar o en curso con fechas programadas</p>
           </div>
         ) : (
-          <div className="bg-white rounded-none border border-zinc-200 border-r-0 border-b-0">
-            <div className="min-w-max border-b border-zinc-200">
+          <div className="bg-white rounded-none border border-zinc-200 border-t-0 border-r-0 border-b-0">
+            <div className="min-w-max border-t border-b border-zinc-200">
                 {/* Header Months */}
                 <div className="flex border-b border-zinc-200 sticky top-0 z-50 bg-white">
                   <div className="w-64 border-l border-r border-zinc-200 p-3 sticky left-0 bg-white z-50">
