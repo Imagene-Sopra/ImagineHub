@@ -18,6 +18,16 @@ export const Roadmap: React.FC = () => {
   const MIN_VISIBLE_MONTH_COLUMNS = 1;
   const MAX_VISIBLE_MONTH_COLUMNS = 12;
   const MIN_VISIBLE_MONTHS = 3;
+  const LAYERS = {
+    grid: 1,
+    todayOverlay: 2,
+    monthLabel: 10,
+    monthGridLines: 20,
+    stickyColumn: 30,
+    stickyHeader: 50,
+    filterMenu: 70,
+    modal: 80,
+  } as const;
 
   const [tasks, setTasks] = useState<Task[]>([]);
   const [projects, setProjects] = useState<Record<string, string>>({});
@@ -666,7 +676,10 @@ export const Roadmap: React.FC = () => {
                 )}
               </button>
               {isFilterMenuOpen && (
-              <div className="absolute right-0 top-full mt-2 w-72 max-h-64 overflow-auto rounded-xl border border-zinc-200 bg-white shadow-xl z-[70] p-2">
+              <div
+                className="absolute right-0 top-full mt-2 w-72 max-h-64 overflow-auto rounded-xl border border-zinc-200 bg-white shadow-xl p-2"
+                style={{ zIndex: LAYERS.filterMenu }}
+              >
 
                 {roadmapFilterOptions.length === 0 ? (
                   <div className="px-2 py-2 text-xs text-zinc-500">No hay elementos para filtrar.</div>
@@ -769,8 +782,8 @@ export const Roadmap: React.FC = () => {
           <div className="bg-white rounded-none border border-zinc-200 border-t-0 border-r-0 border-b-0">
             <div className="min-w-max border-t border-b border-zinc-200">
                 {/* Header Months */}
-                <div className="flex border-b border-zinc-200 sticky top-0 z-50 bg-white">
-                  <div className="w-64 border-l border-r border-zinc-200 p-3 sticky left-0 bg-white z-50">
+                <div className="flex border-b border-zinc-200 sticky top-0 bg-white" style={{ zIndex: LAYERS.stickyHeader }}>
+                  <div className="w-64 border-l border-r border-zinc-200 p-3 sticky left-0 bg-white" style={{ zIndex: LAYERS.stickyHeader }}>
                     <div className="flex flex-col gap-1.5">
                       <div className="flex items-center">
                         <span className="font-bold text-zinc-500 text-xs uppercase tracking-wider">Tarea / Proyecto</span>
@@ -821,7 +834,10 @@ export const Roadmap: React.FC = () => {
                     </div>
                   </div>
                   <div className="relative grid flex-1" style={{ gridTemplateColumns: timelineGridTemplate }}>
-                    <div className="absolute inset-0 grid pointer-events-none z-20" style={{ gridTemplateColumns: timelineGridTemplate }}>
+                    <div
+                      className="absolute inset-0 grid pointer-events-none"
+                      style={{ gridTemplateColumns: timelineGridTemplate, zIndex: LAYERS.monthGridLines }}
+                    >
                       {months.map((_, idx) => (
                         <div key={idx} className="border-r border-zinc-200" />
                       ))}
@@ -830,9 +846,10 @@ export const Roadmap: React.FC = () => {
                       <div
                         key={idx}
                         className={cn(
-                          "relative z-10 text-center font-bold text-zinc-900 overflow-hidden transition-[padding] duration-150",
+                          "relative text-center font-bold text-zinc-900 overflow-hidden transition-[padding] duration-150",
                           monthColumnWidth < 120 ? "px-2 py-3" : "p-4"
                         )}
+                        style={{ zIndex: LAYERS.monthLabel }}
                         title={format(month, "MMMM yyyy", { locale: es })}
                       >
                         <span className="capitalize block truncate">{format(month, monthLabelFormat, { locale: es })}</span>
@@ -845,8 +862,8 @@ export const Roadmap: React.FC = () => {
               {/* Timeline View */}
               <div className="relative bg-white">
                   {/* Grid Lines with high visibility */}
-                  <div className="absolute inset-0 flex pointer-events-none z-[1]">
-                    <div className="w-64 border-l border-r border-zinc-200 sticky left-0 bg-white z-20 transition-colors"></div>
+                  <div className="absolute inset-0 flex pointer-events-none" style={{ zIndex: LAYERS.grid }}>
+                    <div className="w-64 border-l border-r border-zinc-200 sticky left-0 bg-white transition-colors" style={{ zIndex: LAYERS.monthGridLines }}></div>
                     <div className="grid flex-1" style={{ gridTemplateColumns: timelineGridTemplate }}>
                       {months.map((_, idx) => (
                         <div key={idx} className="border-r border-zinc-200"></div>
@@ -857,7 +874,7 @@ export const Roadmap: React.FC = () => {
                   {/* Today Line Overlay */}
                   <div
                     className="absolute inset-y-0 right-0 pointer-events-none overflow-hidden"
-                    style={{ left: `${FIRST_COLUMN_WIDTH}px`, zIndex: 2 }}
+                    style={{ left: `${FIRST_COLUMN_WIDTH}px`, zIndex: LAYERS.todayOverlay }}
                   >
                     <div className="relative h-full min-w-0">
                       <div
@@ -883,7 +900,10 @@ export const Roadmap: React.FC = () => {
                           className="flex items-center bg-teal-50/60 cursor-pointer select-none"
                           onClick={() => setVacationsCollapsed((prev) => !prev)}
                         >
-                          <div className="w-64 border-l border-r border-zinc-200 p-3 sticky left-0 bg-teal-50 z-30 flex-shrink-0 flex items-center gap-2">
+                          <div
+                            className="w-64 border-l border-r border-zinc-200 p-3 sticky left-0 bg-teal-50 flex-shrink-0 flex items-center gap-2"
+                            style={{ zIndex: LAYERS.stickyColumn }}
+                          >
                             {vacationsCollapsed ? <ChevronRight size={13} className="text-teal-600" /> : <ChevronDown size={13} className="text-teal-600" />}
                             <Umbrella size={13} className="text-teal-600" />
                             <span className="text-xs font-bold text-teal-800 uppercase tracking-wide">
@@ -899,7 +919,10 @@ export const Roadmap: React.FC = () => {
 
                         {!vacationsCollapsed && vacationsByPerson.map((personGroup) => (
                             <div key={personGroup.person} className="flex items-center group hover:bg-teal-50 transition-colors">
-                              <div className="w-64 border-l border-r border-zinc-200 p-3 sticky left-0 bg-white z-30 group-hover:bg-teal-50 transition-colors flex-shrink-0">
+                              <div
+                                className="w-64 border-l border-r border-zinc-200 p-3 sticky left-0 bg-white group-hover:bg-teal-50 transition-colors flex-shrink-0"
+                                style={{ zIndex: LAYERS.stickyColumn }}
+                              >
                                 <div className="flex items-center justify-between gap-2">
                                   <div className="flex items-center gap-1.5 min-w-0">
                                     <Umbrella size={11} className="text-teal-500 shrink-0" />
@@ -934,8 +957,8 @@ export const Roadmap: React.FC = () => {
                                   return (
                                     <div
                                       key={vacation.id}
-                                      className="absolute z-10 h-5 top-1/2 -translate-y-1/2 rounded-md border border-teal-300 bg-teal-100 shadow-sm flex items-center justify-center"
-                                      style={{ left: vRange.left, width: vRange.width }}
+                                      className="absolute h-5 top-1/2 -translate-y-1/2 rounded-md border border-teal-300 bg-teal-100 shadow-sm flex items-center justify-center"
+                                      style={{ left: vRange.left, width: vRange.width, zIndex: LAYERS.monthLabel }}
                                       title={`Vacaciones de ${personGroup.person}: ${vacation.fechaInicio} - ${vacation.fechaFin}`}
                                     >
                                       <span className="px-2 text-[9px] font-bold uppercase tracking-wide truncate max-w-full whitespace-nowrap text-teal-800 drop-shadow-[0_1px_0_rgba(255,255,255,0.7)]">
@@ -959,7 +982,10 @@ export const Roadmap: React.FC = () => {
 
                       return (
                         <div key={task.id} className="flex items-center group hover:bg-zinc-50 transition-colors">
-                          <div className="w-64 border-l border-r border-zinc-200 p-4 sticky left-0 bg-white z-30 group-hover:bg-zinc-50 transition-colors flex-shrink-0">
+                          <div
+                            className="w-64 border-l border-r border-zinc-200 p-4 sticky left-0 bg-white group-hover:bg-zinc-50 transition-colors flex-shrink-0"
+                            style={{ zIndex: LAYERS.stickyColumn }}
+                          >
                             <div className="flex items-center gap-2 mb-1">
                               {task.proyectoId ? (
                                 <Briefcase size={12} className="text-zinc-450" />
@@ -1050,12 +1076,13 @@ export const Roadmap: React.FC = () => {
                             {plannedRange && (
                               <div
                                 className={cn(
-                                  "absolute z-10 h-5 top-1/2 -translate-y-1/2 rounded-md shadow-sm flex items-center justify-center border transition-all cursor-pointer",
+                                  "absolute h-5 top-1/2 -translate-y-1/2 rounded-md shadow-sm flex items-center justify-center border transition-all cursor-pointer",
                                   getTaskColorClasses(task.tipo)
                                 )}
                                 style={{
                                   left: plannedRange.left,
                                   width: plannedRange.width,
+                                  zIndex: LAYERS.monthLabel,
                                 }}
                                 title={`${fullTitle} (${getTaskStatusLabel(task.estado)}) | Plan: ${task.fechaInicio || "-"} - ${task.fechaFin || "-"} | Punt.: ${task.score}${task.tipo ? ` | Tipo: ${task.tipo === 'Presentation' ? 'Presentación' : task.tipo}` : ''}`}
                               />
@@ -1064,12 +1091,13 @@ export const Roadmap: React.FC = () => {
                             {durationRange && (
                               <div
                                 className={cn(
-                                  "absolute z-20 h-5 top-1/2 -translate-y-1/2 rounded-md shadow-sm flex items-center justify-center border transition-all cursor-pointer",
+                                  "absolute h-5 top-1/2 -translate-y-1/2 rounded-md shadow-sm flex items-center justify-center border transition-all cursor-pointer",
                                   getTaskDurationColorClasses(task.tipo)
                                 )}
                                 style={{
                                   left: durationRange.left,
                                   width: durationRange.width,
+                                  zIndex: LAYERS.monthGridLines,
                                 }}
                                 title={`${fullTitle} | Duración estimada: ${task.estimacion} día${task.estimacion === 1 ? "" : "s"} laborables (desde fecha fin)`}
                               />
@@ -1077,10 +1105,11 @@ export const Roadmap: React.FC = () => {
 
                             {statusLabelRange && (
                               <div
-                                className="absolute z-20 h-5 top-1/2 -translate-y-1/2 flex items-center justify-center pointer-events-none"
+                                className="absolute h-5 top-1/2 -translate-y-1/2 flex items-center justify-center pointer-events-none"
                                 style={{
                                   left: statusLabelRange.left,
                                   width: statusLabelRange.width,
+                                  zIndex: LAYERS.monthGridLines,
                                 }}
                               >
                                 <span className="px-2 text-[9px] font-bold uppercase tracking-wide truncate max-w-full whitespace-nowrap text-zinc-950 drop-shadow-[0_1px_0_rgba(255,255,255,0.7)]">
@@ -1124,7 +1153,7 @@ export const Roadmap: React.FC = () => {
 
       {/* Vacation Modal */}
       {isVacationModalOpen && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 backdrop-blur-sm">
+        <div className="fixed inset-0 flex items-center justify-center bg-black/40 backdrop-blur-sm" style={{ zIndex: LAYERS.modal }}>
           <div className="bg-white rounded-2xl shadow-2xl border border-zinc-200 w-full max-w-sm mx-4 overflow-hidden">
             <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-100">
               <div className="flex items-center gap-2">
