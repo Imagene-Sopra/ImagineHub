@@ -677,7 +677,7 @@ export const Roadmap: React.FC = () => {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <div className="relative" ref={filterMenuRef}>
+            <div className="relative z-[60]" ref={filterMenuRef}>
               <button
                 type="button"
                 onClick={() => setIsFilterMenuOpen((prev) => !prev)}
@@ -691,7 +691,7 @@ export const Roadmap: React.FC = () => {
                 )}
               </button>
               {isFilterMenuOpen && (
-              <div className="absolute right-0 top-full mt-2 w-72 max-h-64 overflow-auto rounded-xl border border-zinc-200 bg-white shadow-xl z-20 p-2">
+              <div className="absolute right-0 top-full mt-2 w-72 max-h-64 overflow-auto rounded-xl border border-zinc-200 bg-white shadow-xl z-[70] p-2">
 
                 {roadmapFilterOptions.length === 0 ? (
                   <div className="px-2 py-2 text-xs text-zinc-500">No hay elementos para filtrar.</div>
