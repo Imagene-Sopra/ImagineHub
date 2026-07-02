@@ -672,12 +672,11 @@ export const Roadmap: React.FC = () => {
             <div>
               <h1 className="text-2xl font-bold text-zinc-900">Roadmap de Tareas</h1>
               <p className="text-zinc-500 text-sm">Visualización temporal de tareas por iniciar y en curso</p>
-              <p className="text-zinc-400 text-xs mt-1 capitalize">Rango visible: {roadmapRangeLabel}</p>
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <div className="relative z-[60]" ref={filterMenuRef}>
+            <div className="relative" ref={filterMenuRef}>
               <button
                 type="button"
                 onClick={() => setIsFilterMenuOpen((prev) => !prev)}
