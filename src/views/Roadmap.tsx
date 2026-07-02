@@ -49,6 +49,24 @@ export const Roadmap: React.FC = () => {
     return isValid(fallbackDate) ? fallbackDate : null;
   };
 
+  const getTaskDateInterval = (task: Task) => {
+    const plannedStart = task.fechaInicio ? parseTaskDate(task.fechaInicio) : null;
+    const plannedEnd = task.fechaFin ? parseTaskDate(task.fechaFin) : null;
+
+    if (plannedStart && plannedEnd) {
+      return plannedStart.getTime() <= plannedEnd.getTime()
+        ? { start: plannedStart, end: plannedEnd }
+        : { start: plannedEnd, end: plannedStart };
+    }
+
+    if (!plannedStart && plannedEnd && task.estimacion && task.estimacion > 0) {
+      return { start: calculateStartDate(plannedEnd, task.estimacion), end: plannedEnd };
+    }
+
+    const fallbackDate = plannedStart || plannedEnd;
+    return fallbackDate ? { start: fallbackDate, end: fallbackDate } : null;
+  };
+
   useEffect(() => {
     // Include both 'todo' and 'in_progress' tasks
     const q = query(collectionGroup(db, "tasks"), where("estado", "in", ["todo", "in_progress"]));
@@ -125,32 +143,11 @@ export const Roadmap: React.FC = () => {
     const years = new Set<number>();
 
     tasks.forEach((task) => {
-      const plannedStart = task.fechaInicio ? parseTaskDate(task.fechaInicio) : null;
-      const plannedEnd = task.fechaFin ? parseTaskDate(task.fechaFin) : null;
+      const interval = getTaskDateInterval(task);
+      if (!interval) return;
 
-      let intervalStart: Date | null = null;
-      let intervalEnd: Date | null = null;
-
-      if (plannedStart && plannedEnd) {
-        if (plannedStart.getTime() <= plannedEnd.getTime()) {
-          intervalStart = plannedStart;
-          intervalEnd = plannedEnd;
-        } else {
-          intervalStart = plannedEnd;
-          intervalEnd = plannedStart;
-        }
-      } else if (!plannedStart && plannedEnd && task.estimacion && task.estimacion > 0) {
-        intervalStart = calculateStartDate(plannedEnd, task.estimacion);
-        intervalEnd = plannedEnd;
-      } else if (plannedStart || plannedEnd) {
-        intervalStart = plannedStart || plannedEnd;
-        intervalEnd = plannedStart || plannedEnd;
-      }
-
-      if (!intervalStart || !intervalEnd) return;
-
-      const startYear = Math.min(intervalStart.getFullYear(), intervalEnd.getFullYear());
-      const endYear = Math.max(intervalStart.getFullYear(), intervalEnd.getFullYear());
+      const startYear = Math.min(interval.start.getFullYear(), interval.end.getFullYear());
+      const endYear = Math.max(interval.start.getFullYear(), interval.end.getFullYear());
 
       for (let year = startYear; year <= endYear; year += 1) {
         years.add(year);
@@ -229,11 +226,6 @@ export const Roadmap: React.FC = () => {
       months: eachMonthOfInterval({ start: rangeStart, end: finalEnd }),
     };
   }, [tasks, vacations, selectedYear]);
-
-  const roadmapRangeLabel =
-    months.length > 0
-      ? `${format(months[0], "MMMM yyyy", { locale: es })} - ${format(months[months.length - 1], "MMMM yyyy", { locale: es })}`
-      : "";
 
   useEffect(() => {
     if (!roadmapScrollRef.current) return;
@@ -363,24 +355,6 @@ export const Roadmap: React.FC = () => {
 
     return grouped;
   }, [vacations]);
-
-  const getTaskDateInterval = (task: Task) => {
-    const plannedStart = task.fechaInicio ? parseTaskDate(task.fechaInicio) : null;
-    const plannedEnd = task.fechaFin ? parseTaskDate(task.fechaFin) : null;
-
-    if (plannedStart && plannedEnd) {
-      return plannedStart.getTime() <= plannedEnd.getTime()
-        ? { start: plannedStart, end: plannedEnd }
-        : { start: plannedEnd, end: plannedStart };
-    }
-
-    if (!plannedStart && plannedEnd && task.estimacion && task.estimacion > 0) {
-      return { start: calculateStartDate(plannedEnd, task.estimacion), end: plannedEnd };
-    }
-
-    const fallbackDate = plannedStart || plannedEnd;
-    return fallbackDate ? { start: fallbackDate, end: fallbackDate } : null;
-  };
 
   const rangesOverlap = (startA: Date, endA: Date, startB: Date, endB: Date) =>
     startA.getTime() <= endB.getTime() && startB.getTime() <= endA.getTime();
@@ -527,18 +501,20 @@ export const Roadmap: React.FC = () => {
   const roadmapTasks = tasks
     .map((task) => {
       const details = getTaskDetails(task);
+      const ranges = getTaskRanges(task);
+      const interval = getTaskDateInterval(task);
       return {
         ...task,
         ...details,
+        ranges,
+        interval,
       };
     })
     .sort((a, b) => b.score - a.score);
 
   const ganttTasks = roadmapTasks.filter((task) => {
-    if (!getTaskRanges(task).hasAnyRange) return false;
-    const interval = getTaskDateInterval(task);
-    if (!interval) return false;
-    return rangesOverlap(interval.start, interval.end, startDate, endDate);
+    if (!task.ranges.hasAnyRange || !task.interval) return false;
+    return rangesOverlap(task.interval.start, task.interval.end, startDate, endDate);
   });
 
   const representedParentIds = new Set(
@@ -975,7 +951,7 @@ export const Roadmap: React.FC = () => {
                     )}
 
                     {filteredRoadmapTasks.map((task) => {
-                      const { plannedRange, durationRange, hasAnyRange } = getTaskRanges(task);
+                      const { plannedRange, durationRange, hasAnyRange } = task.ranges;
                       if (!hasAnyRange) return null;
                       const statusLabelRange = plannedRange || durationRange;
                       const parentName = getParentName(task);
