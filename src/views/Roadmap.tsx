@@ -24,6 +24,7 @@ export const Roadmap: React.FC = () => {
     monthLabel: 10,
     monthGridLines: 20,
     stickyColumn: 30,
+    rowDivider: 40,
     stickyHeader: 50,
     filterMenu: 70,
     modal: 80,
@@ -45,7 +46,9 @@ export const Roadmap: React.FC = () => {
   const [vacationForm, setVacationForm] = useState({ persona: "", fechaInicio: "", fechaFin: "" });
   const [vacationFormError, setVacationFormError] = useState("");
   const [vacationSubmitting, setVacationSubmitting] = useState(false);
+  const [noDateTasksCollapsed, setNoDateTasksCollapsed] = useState(true);
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
+  const [pendingTodayScroll, setPendingTodayScroll] = useState(false);
   const [visibleMonthColumns, setVisibleMonthColumns] = useState(INITIAL_VISIBLE_MONTHS);
   const roadmapScrollRef = useRef<HTMLDivElement | null>(null);
   const hasInitializedRoadmapScroll = useRef(false);
@@ -81,8 +84,7 @@ export const Roadmap: React.FC = () => {
     // Include both 'todo' and 'in_progress' tasks
     const q = query(collectionGroup(db, "tasks"), where("estado", "in", ["todo", "in_progress"]));
     const unsub = onSnapshot(q, (snap) => {
-      const taskList = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task))
-        .filter(t => t.fechaInicio || t.fechaFin || (t.estimacion && t.fechaFin)); // Keep tasks visible when only end date + duration are provided
+      const taskList = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task));
       setTasks(taskList);
       setLoading(false);
     });
@@ -334,6 +336,59 @@ export const Roadmap: React.FC = () => {
   const todayLineProgress = useMemo(() => {
     return getMonthGridProgress(new Date(), { includeTime: true });
   }, [startDate, endDate, months.length]);
+  const currentYear = new Date().getFullYear();
+  const showTodayIndicator = selectedYear === null || selectedYear === currentYear;
+
+  const scrollToToday = () => {
+    const currentYear = new Date().getFullYear();
+    if (selectedYear !== null && selectedYear !== currentYear) {
+      setPendingTodayScroll(true);
+      setSelectedYear(currentYear);
+      return;
+    }
+
+    if (!roadmapScrollRef.current || months.length === 0) return;
+
+    const element = roadmapScrollRef.current;
+    const timelineWidth = months.length * monthColumnWidth;
+    const viewportWidth = roadmapViewportWidth > 0 ? roadmapViewportWidth : element.clientWidth;
+    const timelineViewportWidth = Math.max(0, viewportWidth - FIRST_COLUMN_WIDTH);
+    const targetScrollLeft = Math.max(0, todayLineProgress * timelineWidth - timelineViewportWidth / 2);
+
+    element.scrollTo({
+      left: targetScrollLeft,
+      behavior: "smooth",
+    });
+  };
+
+  useEffect(() => {
+    if (!pendingTodayScroll) return;
+    if (loading) return;
+    if (!roadmapScrollRef.current || months.length === 0) return;
+
+    const currentYear = new Date().getFullYear();
+    if (selectedYear !== currentYear) return;
+
+    const element = roadmapScrollRef.current;
+    const timelineWidth = months.length * monthColumnWidth;
+    const viewportWidth = roadmapViewportWidth > 0 ? roadmapViewportWidth : element.clientWidth;
+    const timelineViewportWidth = Math.max(0, viewportWidth - FIRST_COLUMN_WIDTH);
+    const targetScrollLeft = Math.max(0, todayLineProgress * timelineWidth - timelineViewportWidth / 2);
+
+    element.scrollTo({
+      left: targetScrollLeft,
+      behavior: "smooth",
+    });
+    setPendingTodayScroll(false);
+  }, [
+    pendingTodayScroll,
+    loading,
+    months.length,
+    monthColumnWidth,
+    roadmapViewportWidth,
+    todayLineProgress,
+    selectedYear,
+  ]);
 
   const normalizePersonName = (name: string) => name.trim().toLocaleLowerCase("es");
 
@@ -555,7 +610,7 @@ export const Roadmap: React.FC = () => {
       .map((name) => ({ id: `assignee:${name}`, type: "assignee" as const, label: name }))
   ].sort((a, b) => a.label.localeCompare(b.label, "es", { sensitivity: "base" }));
 
-  const filteredRoadmapTasks = ganttTasks.filter((task) => {
+  const matchesRoadmapFilters = (task: Task) => {
     if (selectedRoadmapFilters.length === 0) return true;
     const parentFilterId = task.proyectoId
       ? `project:${task.proyectoId}`
@@ -566,7 +621,14 @@ export const Roadmap: React.FC = () => {
     const taskFilterIds = [parentFilterId, ...assigneeFilterIds].filter((value): value is string => !!value);
     if (taskFilterIds.length === 0) return false;
     return taskFilterIds.some((filterId) => selectedRoadmapFilters.includes(filterId));
+  };
+
+  const filteredRoadmapTasks = ganttTasks.filter((task) => {
+    return matchesRoadmapFilters(task);
   });
+
+  const noDateTasks = roadmapTasks.filter((task) => !task.interval);
+  const filteredNoDateTasks = noDateTasks.filter((task) => matchesRoadmapFilters(task));
 
   const toggleRoadmapFilter = (filterId: string) => {
     setSelectedRoadmapFilters((prev) =>
@@ -789,7 +851,7 @@ export const Roadmap: React.FC = () => {
                         <span className="font-bold text-zinc-500 text-xs uppercase tracking-wider">Tarea / Proyecto</span>
                       </div>
 
-                      <div className="flex items-center justify-between gap-2">
+                      <div className="grid grid-cols-[auto_1fr_auto] items-center gap-2">
                         {taskYears.length > 0 ? (
                           <div className="flex items-center gap-1">
                             <span className="text-[9px] font-bold uppercase tracking-wider text-zinc-500">Año</span>
@@ -809,6 +871,17 @@ export const Roadmap: React.FC = () => {
                         ) : (
                           <div />
                         )}
+
+                        <div className="flex justify-center">
+                          <button
+                            type="button"
+                            onClick={scrollToToday}
+                            className="cursor-pointer inline-flex items-center justify-center h-6 rounded-full border border-zinc-200 px-2 text-[9px] font-bold uppercase tracking-wider text-zinc-600 hover:text-zinc-900 hover:border-zinc-300 bg-white transition-colors"
+                            title="Ir al día de hoy"
+                          >
+                            Hoy
+                          </button>
+                        </div>
 
                         <div className="flex items-center gap-1 rounded-full border border-zinc-200 bg-white px-1 py-0.5">
                           <button
@@ -872,34 +945,37 @@ export const Roadmap: React.FC = () => {
                   </div>
 
                   {/* Today Line Overlay */}
-                  <div
-                    className="absolute inset-y-0 right-0 pointer-events-none overflow-hidden"
-                    style={{ left: `${FIRST_COLUMN_WIDTH}px`, zIndex: LAYERS.todayOverlay }}
-                  >
-                    <div className="relative h-full min-w-0">
-                      <div
-                        className="absolute inset-y-0 w-0.5 bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.4)] flex flex-col items-center"
-                        style={{
-                          left: `${todayLineProgress * 100}%`
-                        }}
-                      >
-                        <div className="bg-red-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow-md whitespace-nowrap mt-2 transform -translate-y-1">
-                          HOY
+                  {showTodayIndicator && (
+                    <div
+                      className="absolute inset-y-0 right-0 pointer-events-none overflow-hidden"
+                      style={{ left: `${FIRST_COLUMN_WIDTH}px`, zIndex: LAYERS.todayOverlay }}
+                    >
+                      <div className="relative h-full min-w-0">
+                        <div
+                          className="absolute inset-y-0 w-0.5 bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.4)] flex flex-col items-center"
+                          style={{
+                            left: `${todayLineProgress * 100}%`
+                          }}
+                        >
+                          <div className="bg-red-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow-md whitespace-nowrap mt-2 transform -translate-y-1">
+                            HOY
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
+                  )}
 
                   {/* Tasks with high visibility horizontal separation lines */}
-                  <div className="relative divide-y divide-zinc-200 bg-white">
+                  <div className="relative bg-white">
 
                     {/* Vacation rows section */}
                     {vacations.length > 0 && (
                       <>
                         <div
-                          className="flex items-center bg-teal-50/60 cursor-pointer select-none"
+                          className="relative flex items-center bg-teal-50/60 cursor-pointer select-none"
                           onClick={() => setVacationsCollapsed((prev) => !prev)}
                         >
+                          <div className="absolute inset-x-0 top-0 h-px bg-zinc-200 pointer-events-none" style={{ zIndex: LAYERS.rowDivider }} />
                           <div
                             className="w-64 border-l border-r border-zinc-200 p-3 sticky left-0 bg-teal-50 flex-shrink-0 flex items-center gap-2"
                             style={{ zIndex: LAYERS.stickyColumn }}
@@ -918,7 +994,8 @@ export const Roadmap: React.FC = () => {
                         </div>
 
                         {!vacationsCollapsed && vacationsByPerson.map((personGroup) => (
-                            <div key={personGroup.person} className="flex items-center group hover:bg-teal-50 transition-colors">
+                            <div key={personGroup.person} className="relative flex items-center group hover:bg-teal-50 transition-colors">
+                              <div className="absolute inset-x-0 top-0 h-px bg-zinc-200 pointer-events-none" style={{ zIndex: LAYERS.rowDivider }} />
                               <div
                                 className="w-64 border-l border-r border-zinc-200 p-3 sticky left-0 bg-white group-hover:bg-teal-50 transition-colors flex-shrink-0"
                                 style={{ zIndex: LAYERS.stickyColumn }}
@@ -981,7 +1058,8 @@ export const Roadmap: React.FC = () => {
                       const fullTitle = parentName ? `${parentName} - ${task.titulo}` : task.titulo;
 
                       return (
-                        <div key={task.id} className="flex items-center group hover:bg-zinc-50 transition-colors">
+                        <div key={task.id} className="relative flex items-center group hover:bg-zinc-50 transition-colors">
+                          <div className="absolute inset-x-0 top-0 h-px bg-zinc-200 pointer-events-none" style={{ zIndex: LAYERS.rowDivider }} />
                           <div
                             className="w-64 border-l border-r border-zinc-200 p-4 sticky left-0 bg-white group-hover:bg-zinc-50 transition-colors flex-shrink-0"
                             style={{ zIndex: LAYERS.stickyColumn }}
@@ -1121,6 +1199,109 @@ export const Roadmap: React.FC = () => {
                         </div>
                       );
                     })}
+
+                    {filteredNoDateTasks.length > 0 && (
+                      <>
+                        <div
+                          className="group relative flex items-center bg-white hover:bg-zinc-100/70 cursor-pointer select-none transition-colors"
+                          onClick={() => setNoDateTasksCollapsed((prev) => !prev)}
+                        >
+                          <div className="absolute inset-x-0 top-0 h-px bg-zinc-200 pointer-events-none" style={{ zIndex: LAYERS.rowDivider }} />
+                          <div
+                            className="w-64 border-l border-r border-zinc-200 p-3 sticky left-0 bg-white group-hover:bg-zinc-100 transition-colors z-30 flex-shrink-0 flex items-center gap-2"
+                            style={{ zIndex: LAYERS.stickyColumn }}
+                          >
+                            {noDateTasksCollapsed ? <ChevronRight size={13} className="text-zinc-600" /> : <ChevronDown size={13} className="text-zinc-600" />}
+                            <Clock size={13} className="text-zinc-600" />
+                            <span className="text-xs font-bold text-zinc-700 uppercase tracking-wide">
+                              Sin fechas ({filteredNoDateTasks.length})
+                            </span>
+                          </div>
+                          <div className="grid flex-1 h-8 bg-white group-hover:bg-zinc-100/60 divide-x divide-zinc-200 transition-colors" style={{ gridTemplateColumns: timelineGridTemplate }}>
+                            {months.map((_, idx) => (
+                              <div key={idx} className="h-full" />
+                            ))}
+                          </div>
+                        </div>
+
+                        {!noDateTasksCollapsed && filteredNoDateTasks.map((task) => {
+                          const parentName = getParentName(task);
+                          const fullTitle = parentName ? `${parentName} - ${task.titulo}` : task.titulo;
+
+                          return (
+                            <div key={`nodate-${task.id}`} className="relative flex items-center group hover:bg-zinc-50 transition-colors">
+                              <div className="absolute inset-x-0 top-0 h-px bg-zinc-200 pointer-events-none" style={{ zIndex: LAYERS.rowDivider }} />
+                              <div
+                                className="w-64 border-l border-r border-zinc-200 p-4 sticky left-0 bg-white z-30 group-hover:bg-zinc-50 transition-colors flex-shrink-0"
+                                style={{ zIndex: LAYERS.stickyColumn }}
+                              >
+                                <div className="flex items-center gap-2 mb-1">
+                                  {task.proyectoId ? (
+                                    <Briefcase size={12} className="text-zinc-450" />
+                                  ) : (
+                                    <Rocket size={12} className="text-zinc-450" />
+                                  )}
+                                  <button
+                                    onClick={() => handleEditTask(task)}
+                                    className="flex items-center gap-1 group/title min-w-0"
+                                    title={`Editar: ${fullTitle}`}
+                                  >
+                                    <h4 className="text-xs font-bold text-zinc-900 truncate group-hover/title:text-blue-600 transition-colors">
+                                      {fullTitle}
+                                    </h4>
+                                    <Pencil size={10} className="shrink-0 text-zinc-300 group-hover/title:text-blue-500 transition-colors" />
+                                  </button>
+                                </div>
+                                <div className="flex flex-wrap gap-1 items-center">
+                                  <div className="flex items-center gap-1">
+                                    <span className={cn(
+                                      "text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider border shadow-sm",
+                                      task.tipo === "PoC" && "bg-indigo-50 border-indigo-200 text-indigo-700",
+                                      task.tipo === "Presentation" && "bg-purple-50 border-purple-200 text-purple-700",
+                                      task.tipo === "Run" && "bg-red-50 border-red-200 text-red-600",
+                                      task.tipo === "Build" && "bg-amber-100 border-amber-300 text-amber-800",
+                                      !task.tipo && "bg-zinc-100 border-zinc-200 text-zinc-600"
+                                    )}>
+                                      Punt. {task.score}
+                                    </span>
+                                    {task.estimacion && task.estimacion > 0 && (
+                                      <span className="text-[9px] bg-orange-100 px-1 rounded text-orange-700 border border-orange-300/80 font-semibold">
+                                        Duración: {task.estimacion}d
+                                      </span>
+                                    )}
+                                  </div>
+                                  {task.tags?.map((tag, i) => (
+                                    <span key={i} className="text-[9px] bg-zinc-100 px-1 rounded text-zinc-500 border border-zinc-200/40">
+                                      {tag}
+                                    </span>
+                                  ))}
+                                  {task.asignadoA?.map((name, i) => {
+                                    const vacationConflict = getAssigneeVacationConflict(task, name);
+
+                                    return (
+                                      <span
+                                        key={i}
+                                        className={cn(
+                                          "inline-flex items-center gap-1 text-[9px] px-1 rounded border font-medium",
+                                          vacationConflict
+                                            ? "bg-yellow-50 text-yellow-700 border-yellow-300"
+                                            : "bg-blue-50 text-blue-600 border-blue-200/60"
+                                        )}
+                                        title={vacationConflict ? `${name} tiene vacaciones del ${vacationConflict.fechaInicio} al ${vacationConflict.fechaFin}` : name}
+                                      >
+                                        {name}
+                                      </span>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+
+                              <div className="flex-1 relative h-12 flex items-center bg-white group-hover:bg-zinc-100/70 min-w-0 overflow-hidden transition-colors px-3" />
+                            </div>
+                          );
+                        })}
+                      </>
+                    )}
                   </div>
               </div>
 
